@@ -61,3 +61,15 @@ options-pricing-lab/
 | Volatility surface data | Synthetic smile (skew, curvature, term structure) priced with Black-Scholes and then inverted by the IV solver, plus optional CSV upload of real quotes. | Works offline with no data feed, and exercises the solver end to end. |
 | App entry point | `streamlit_app.py` with `st.navigation` and a hidden default menu; custom sidebar with the mode toggle above the page links. | The toggle stays at the top of the sidebar on every page. |
 | Light / dark mode | `[theme.light]` and `[theme.dark]` in `config.toml`; CSS and Plotly colours read `st.context.theme.type`. | Both modes are designed rather than one being an afterthought. |
+| Binomial Greeks | Δ, Γ, Θ from the first two tree steps; ν, ρ bumped. | Spot bumps alias against the lattice's oscillation (bumped Γ was 26% off). |
+| PDE payoff | Cell-average the payoff in the strike's cell. | Without it, error depended on where K fell between nodes; with it, a clean O(h²). |
+| Benchmark timing | Best of up to 7 repeats within a 25 ms budget. | Sub-millisecond timings were dominated by warm-up and jitter. |
+| FX display | Method differences in pips; premium per 1m base notional. | The units an FX trader actually quotes. |
+| Python version | 3.12+ | NumPy 2.5 (pinned) requires it. |
+| Screenshot tooling | Node Playwright (`scripts/*.cjs`). | Reuses the pre-installed browser; no second Playwright install. |
+
+## What was built, by milestone
+
+1. **Engine:** all six components, with 313 tests plus 2 doctests (textbook values, no-arbitrage, convergence orders, MC statistics, IV round trips, Greeks).
+2. **UI:** seven pages, a Plain English / Pro switch bound to `?mode=`, persistent inputs across pages, presets.
+3. **Polish:** screenshot review in light, dark and phone-width layouts; README figure generated from the library; CI on Python 3.12 and 3.13.
