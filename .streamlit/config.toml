@@ -1,0 +1,59 @@
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "type"
+
+[server]
+headless = true
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+# ---------------------------------------------------------------------------
+# Theme. Shared settings live in [theme]; colours are set per mode so that both
+# light and dark are designed rather than one being an automatic inversion.
+# The same tokens are mirrored in app/theme.py for Plotly charts and CSS.
+# ---------------------------------------------------------------------------
+[theme]
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+baseRadius = "10px"
+buttonRadius = "8px"
+headingFontWeights = [700, 650, 600, 600, 600, 600]
+headingFontSizes = ["2.4rem", "1.6rem", "1.2rem", "1.05rem", "1rem", "0.9rem"]
+showWidgetBorder = true
+showSidebarBorder = true
+
+[theme.light]
+primaryColor = "#4f46e5"
+backgroundColor = "#f7f8fa"
+secondaryBackgroundColor = "#eef0f4"
+textColor = "#111827"
+borderColor = "#e2e5eb"
+linkColor = "#4f46e5"
+greenColor = "#15803d"
+redColor = "#dc2626"
+blueColor = "#2a78d6"
+dataframeHeaderBackgroundColor = "#f1f3f6"
+
+[theme.light.sidebar]
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f4f7"
+
+[theme.dark]
+primaryColor = "#8b8cf8"
+backgroundColor = "#0c0e13"
+secondaryBackgroundColor = "#1a1d25"
+textColor = "#e6e8ee"
+borderColor = "#262a34"
+linkColor = "#a5a6fb"
+greenColor = "#34c46b"
+redColor = "#f06565"
+blueColor = "#3987e5"
+dataframeHeaderBackgroundColor = "#161922"
+
+[theme.dark.sidebar]
+backgroundColor = "#101218"
+secondaryBackgroundColor = "#1a1d25"

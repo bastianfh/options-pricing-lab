@@ -1,0 +1,217 @@
+/* Options Pricing Lab: a small layer on top of the Streamlit theme in .streamlit/config.toml.
+   Colours that differ between light and dark come from --opl-* variables injected by app/ui.py;
+   everything else inherits the theme's text colour so it works in both modes. */
+
+/* ---------- layout ---------- */
+.block-container,
+[data-testid="stMainBlockContainer"] {
+  max-width: 1240px;
+  padding-top: 2.6rem;
+  padding-bottom: 4rem;
+}
+[data-testid="stAppViewContainer"] { font-feature-settings: "cv11", "ss01"; }
+
+/* ---------- headers ---------- */
+.opl-header { margin: 0 0 1.4rem 0; }
+.opl-header h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0 0 0.45rem 0;
+  padding: 0;
+}
+.opl-eyebrow {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--opl-accent);
+  margin-bottom: 0.55rem;
+}
+.opl-lede {
+  font-size: 1.04rem;
+  line-height: 1.55;
+  opacity: 0.68;
+  max-width: 760px;
+  margin: 0;
+}
+.opl-section { margin: 1.9rem 0 0.7rem 0; }
+.opl-section h3 {
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.25rem 0;
+  padding: 0;
+}
+.opl-section-lede {
+  font-size: 0.93rem;
+  line-height: 1.5;
+  opacity: 0.66;
+  margin: 0;
+  max-width: 820px;
+}
+.opl-card-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin: 0 0 0.35rem 0;
+}
+
+/* ---------- stats ---------- */
+.opl-stat { line-height: 1.2; }
+.opl-stat-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  opacity: 0.62;
+  margin-bottom: 0.3rem;
+}
+.opl-stat-value {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.opl-stat-xl .opl-stat-value { font-size: 3.1rem; letter-spacing: -0.035em; line-height: 1.05; }
+.opl-stat-lg .opl-stat-value { font-size: 1.75rem; }
+.opl-stat-md .opl-stat-value { font-size: 1.3rem; }
+.opl-stat-sm .opl-stat-value { font-size: 1.05rem; }
+.opl-stat-sub {
+  font-size: 0.82rem;
+  opacity: 0.62;
+  margin-top: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+.opl-stat-value.gain, .opl-gain { color: var(--opl-gain); }
+.opl-stat-value.loss, .opl-loss { color: var(--opl-loss); }
+.opl-stat-value.muted { opacity: 0.4; }
+
+/* ---------- chips ---------- */
+.opl-chip {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 550;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.12);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.opl-chip.gain { background: var(--opl-gain-soft); color: var(--opl-gain); }
+.opl-chip.loss { background: var(--opl-loss-soft); color: var(--opl-loss); }
+.opl-chip.accent { background: var(--opl-accent-soft); color: var(--opl-accent); }
+
+/* ---------- plain-English explanation ---------- */
+.opl-explain {
+  font-size: 0.93rem;
+  line-height: 1.55;
+  margin: 0.55rem 0 0 0;
+  padding: 0.6rem 0.85rem;
+  border-left: 3px solid var(--opl-accent);
+  background: var(--opl-accent-soft);
+  border-radius: 0 8px 8px 0;
+}
+.opl-note {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  opacity: 0.66;
+  margin: 0.4rem 0 0 0;
+}
+
+/* ---------- method cards ---------- */
+.opl-method-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+.opl-method-desc {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  line-height: 1.4;
+  min-height: 4.2em;
+  margin-bottom: 0.6rem;
+}
+.opl-method-price {
+  font-size: 1.55rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.4rem;
+}
+.opl-method-meta {
+  font-size: 0.76rem;
+  opacity: 0.62;
+  margin-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+.opl-method.unavailable .opl-method-price { opacity: 0.3; }
+
+/* ---------- Greek rows (plain mode) ---------- */
+.opl-greek-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(90px, 0.6fr) 2.4fr;
+  gap: 1.2rem;
+  align-items: center;
+  padding: 0.8rem 0.2rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.14);
+}
+.opl-greek-row:last-child { border-bottom: none; }
+.opl-greek-row:first-child { padding-top: 0.2rem; }
+.opl-greek-name { font-size: 0.9rem; font-weight: 600; }
+.opl-greek-tag { font-size: 0.74rem; opacity: 0.5; }
+.opl-greek-value {
+  font-size: 1.3rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.opl-greek-explain { font-size: 0.86rem; line-height: 1.5; opacity: 0.72; }
+@media (max-width: 760px) {
+  .opl-greek-row { grid-template-columns: 1fr auto; }
+  .opl-greek-explain { grid-column: 1 / -1; }
+}
+
+/* ---------- home ---------- */
+.opl-hero h1 { font-size: 2.8rem; }
+.opl-link-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.2rem; }
+.opl-link-desc { font-size: 0.86rem; opacity: 0.64; line-height: 1.45; min-height: 2.6em; }
+.opl-preset-title { font-size: 0.92rem; font-weight: 600; margin-bottom: 0.2rem; }
+.opl-preset-desc { font-size: 0.8rem; opacity: 0.64; line-height: 1.45; min-height: 3.5em; }
+.opl-statstrip { display: flex; gap: 2.4rem; flex-wrap: wrap; margin: 1.2rem 0 0.4rem 0; }
+.opl-statstrip .num {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--opl-accent);
+  font-variant-numeric: tabular-nums;
+}
+.opl-statstrip .lbl { font-size: 0.82rem; opacity: 0.62; }
+
+/* ---------- sidebar ---------- */
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding-top: 1.2rem; }
+.opl-sidebar-rule { height: 1px; background: rgba(128, 128, 128, 0.18); margin: 0.2rem 0 0.4rem 0; }
+.opl-sidebar-footer { font-size: 0.76rem; opacity: 0.6; line-height: 1.5; margin-top: 1.6rem; }
+.opl-sidebar-footer p { margin: 0 0 0.4rem 0; font-size: 0.76rem; line-height: 1.5; }
+.opl-sidebar-footer a { color: inherit; }
+[data-testid="stSidebar"] [data-testid="stPageLink"] a { padding: 0.35rem 0.6rem; border-radius: 8px; }
+
+/* ---------- containers & widgets ---------- */
+[class*="st-key-card_"] {
+  background: var(--opl-card);
+  border-radius: 14px !important;
+  box-shadow: var(--opl-card-shadow);
+  padding: 1.1rem 1.2rem 1.15rem 1.2rem !important;
+}
+[data-testid="stExpander"] details { border-radius: 10px; }
+[data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
+[data-testid="stCaptionContainer"] { font-variant-numeric: tabular-nums; }
+
+/* ---------- methods page ---------- */
+.opl-refs { font-size: 0.82rem; opacity: 0.62; margin-top: 0.6rem; }
+
+@media (max-width: 640px) {
+  .opl-header h1, .opl-hero h1 { font-size: 1.8rem; }
+  .opl-stat-xl .opl-stat-value { font-size: 2.4rem; }
+  .block-container, [data-testid="stMainBlockContainer"] { padding-left: 1rem; padding-right: 1rem; }
+}
