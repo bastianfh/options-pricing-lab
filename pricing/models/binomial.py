@@ -105,6 +105,18 @@ def binomial_price(
     if sigma <= 0.0:
         raise ValueError("The binomial tree requires sigma > 0.")
 
+    return _backward_induction(S, K, T, r, sigma, q, opt, style, n_steps)[0][0]
+
+
+def _backward_induction(
+    S: float, K: float, T: float, r: float, sigma: float, q: float,
+    opt: OptionType, style: ExerciseStyle, n_steps: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Roll the tree back to time 0, returning the value vectors at steps 0, 1 and 2.
+
+    Steps 1 and 2 are kept because the tree Greeks are read off them; entries
+    for steps beyond ``n_steps`` are empty arrays.
+    """
     u, _, p = crr_parameters(T, r, sigma, n_steps, q)
     disc = np.exp(-r * T / n_steps)
     disc_p, disc_1mp = disc * p, disc * (1.0 - p)
@@ -112,6 +124,7 @@ def binomial_price(
     # Terminal asset prices, j = 0 (all down moves) ... N (all up moves).
     j = np.arange(n_steps + 1)
     values = payoff(S * u ** (2 * j - n_steps), K, opt)
+    kept: dict[int, np.ndarray] = {n_steps: values} if n_steps <= 2 else {}
 
     american = style is ExerciseStyle.AMERICAN
     for i in range(n_steps - 1, -1, -1):
@@ -119,4 +132,55 @@ def binomial_price(
         if american:
             spot_i = S * u ** (2 * np.arange(i + 1) - i)
             np.maximum(values, payoff(spot_i, K, opt), out=values)
-    return float(values[0])
+        if i <= 2:
+            kept[i] = values
+    empty = np.empty(0)
+    return kept[0], kept.get(1, empty), kept.get(2, empty)
+
+
+def binomial_tree_greeks(
+    S: float,
+    K: float,
+    T: float,
+    r: float,
+    sigma: float,
+    q: float = 0.0,
+    option_type: Union[str, OptionType] = "call",
+    exercise: Union[str, ExerciseStyle] = "european",
+    n_steps: int = 500,
+) -> tuple[float, float, float, float]:
+    """Price, delta, gamma and theta read directly from the tree (Hull, sec. 21.1).
+
+    With :math:`f_{i,j}` the value at step :math:`i`, node :math:`j`:
+
+    .. math::
+
+        \\Delta = \\frac{f_{1,1} - f_{1,0}}{Su - Sd}, \\qquad
+        \\Gamma = \\frac{\\dfrac{f_{2,2} - f_{2,1}}{Su^2 - S} - \\dfrac{f_{2,1} - f_{2,0}}{S - Sd^2}}
+                       {\\tfrac12 (Su^2 - Sd^2)}, \\qquad
+        \\Theta = \\frac{f_{2,1} - f_{0,0}}{2\\Delta t}
+
+    These are finite differences on the lattice itself. They avoid the
+    problem with bump-and-reprice on a tree: the CRR price "wiggles" as a
+    function of ``S`` with period ``2 sigma sqrt(dt)`` in log-spot, so a spot
+    bump of similar size gives a badly aliased gamma.
+
+    Returns
+    -------
+    (price, delta, gamma, theta)
+    """
+    validate_inputs(S, K, T, sigma)
+    if n_steps < 3 or T <= 0.0 or sigma <= 0.0:
+        raise ValueError("Tree Greeks need n_steps >= 3, T > 0 and sigma > 0.")
+    opt, style = to_option_type(option_type), to_exercise_style(exercise)
+    u, d, _ = crr_parameters(T, r, sigma, n_steps, q)
+    f0, f1, f2 = _backward_induction(S, K, T, r, sigma, q, opt, style, n_steps)
+    dt = T / n_steps
+
+    delta = (f1[1] - f1[0]) / (S * u - S * d)
+    s_uu, s_dd = S * u * u, S * d * d
+    delta_up = (f2[2] - f2[1]) / (s_uu - S)
+    delta_dn = (f2[1] - f2[0]) / (S - s_dd)
+    gamma = (delta_up - delta_dn) / (0.5 * (s_uu - s_dd))
+    theta = (f2[1] - f0[0]) / (2 * dt)
+    return float(f0[0]), float(delta), float(gamma), float(theta)

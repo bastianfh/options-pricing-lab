@@ -81,3 +81,15 @@ class TestEdgeCases:
         u, d, p = crr_parameters(T, r, sigma, 1)
         expected = np.exp(-r * T) * p * (S * u - K)
         assert binomial_price(S, K, T, r, sigma, n_steps=1) == pytest.approx(expected)
+
+
+def test_tree_greeks_match_black_scholes() -> None:
+    from pricing.greeks import black_scholes_greeks
+    from pricing.models.binomial import binomial_tree_greeks
+
+    price, delta, gamma, theta = binomial_tree_greeks(100, 100, 1.0, 0.05, 0.2, 0.01, "put", n_steps=1000)
+    exact = black_scholes_greeks(100, 100, 1.0, 0.05, 0.2, 0.01, "put")
+    assert delta == pytest.approx(exact.delta, abs=1e-3)
+    assert gamma == pytest.approx(exact.gamma, abs=1e-4)
+    assert theta == pytest.approx(exact.theta, abs=0.02)
+    assert price == pytest.approx(binomial_price(100, 100, 1.0, 0.05, 0.2, 0.01, "put", n_steps=1000))
