@@ -159,9 +159,19 @@ def apply_values(**values: object) -> None:
         st.session_state[f"in_{name}"] = value
 
 
+def _reset_strategy_strikes() -> None:
+    """Keep the Payoff page's strikes sensible after the spot changes scale (stock <-> FX)."""
+    spot = float(st.session_state["in_S"])
+    fx = st.session_state.get("in_asset") == "fx"
+    st.session_state["pay_center"] = round(spot, 4 if fx else 0)
+    st.session_state["pay_width"] = round(spot * 0.05, 4 if fx else 0)
+    st.session_state.pop("pay_custom_df", None)
+
+
 def _on_asset_change() -> None:
     defaults = FX_DEFAULTS if st.session_state["in_asset"] == "fx" else STOCK_DEFAULTS
     apply_values(**defaults)
+    _reset_strategy_strikes()
 
 
 def _on_pair_change() -> None:
@@ -173,6 +183,7 @@ def _on_pair_change() -> None:
     else:
         spot = {"GBP/USD": 1.2700, "AUD/USD": 0.6600, "USD/CHF": 0.8800, "USD/CAD": 1.3700}[pair]
         apply_values(S=spot, K=spot, vol=8.0)
+    _reset_strategy_strikes()
 
 
 @dataclass(frozen=True)

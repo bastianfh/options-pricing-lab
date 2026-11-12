@@ -215,3 +215,6 @@
   .opl-stat-xl .opl-stat-value { font-size: 2.4rem; }
   .block-container, [data-testid="stMainBlockContainer"] { padding-left: 1rem; padding-right: 1rem; }
 }
+.opl-method-plain { font-size: 1.02rem; line-height: 1.7; max-width: 760px; margin: 0.2rem 0 0.6rem 0; }
+[data-testid="stTabs"] [data-baseweb="tab-list"] { gap: 0.2rem; flex-wrap: wrap; }
+[class*="st-key-card_method_doc"] .katex-display { margin: 1rem 0; overflow-x: auto; overflow-y: hidden; }

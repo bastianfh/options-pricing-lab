@@ -320,7 +320,7 @@ TEXT: dict[str, Entry] = {
     "gx.title": {"plain": "How risk changes", "pro": "Greeks explorer"},
     "gx.lede": {
         "plain": "Pick one of the sensitivities and watch how it changes as the asset price moves and as expiry gets closer.",
-        "pro": "Black-Scholes Greeks across spot and time to expiry for the contract set below.",
+        "pro": "Black-Scholes Greeks across spot and time to expiry for the contract on the left.",
     },
     "gx.select": {"plain": "Which sensitivity?", "pro": "Greek"},
     "gx.vs_spot.title": {"plain": "As the asset price changes", "pro": "{greek} vs spot, by time to expiry"},
@@ -483,6 +483,21 @@ TEXT: dict[str, Entry] = {
     "val.col.final_error": "Error at finest",
     "val.col.status": "Check",
     "val.pass": "✓ Pass",
+    "val.running": "Running convergence studies…",
+    "val.summary.order_suffix": " · order of convergence",
+    "val.summary.sub": {
+        "plain": "{check} · final error {final}",
+        "pro": "expected {expected} · final {what} {final}",
+    },
+    "val.summary.explain": (
+        "The big numbers measure how fast each method closes in on the exact answer. 1 means doubling the "
+        "effort halves the error; 2 means it quarters it; 0.5 means you need 4× the effort to halve it. "
+        "All three match the theory."
+    ),
+    "val.bin.even": {"plain": "Even number of steps", "pro": "even N"},
+    "val.bin.odd": {"plain": "Odd number of steps", "pro": "odd N"},
+    "val.table": {"plain": "Show the numbers", "pro": "Error table"},
+    "val.am.x": {"plain": "Steps / grid size", "pro": "N (tree) / M = N (PDE)"},
     "val.fail": "✗ Check",
     "val.work.title": {"plain": "Accuracy vs computing time", "pro": "Work-precision diagram"},
     "val.work.lede": {
