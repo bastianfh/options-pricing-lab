@@ -226,6 +226,8 @@ TEXT: dict[str, Entry] = {
         "pro": "American: no closed form. Tree vs PDE deviation {spread}. BS and MC (European-only) shown greyed out.",
     },
     "pricer.vs_reference": {"plain": "{diff} vs formula", "pro": "{diff} vs BS"},
+    "pricer.vs_tree": {"plain": "{diff} vs tree", "pro": "{diff} vs CRR"},
+    "pips": "{x} pips",
     "pricer.unavailable": {"plain": "Only for options used at expiry", "pro": "European only"},
     "pricer.runtime": "{ms:.1f} ms",
     "pricer.ci": {"plain": "Likely range {lo} to {hi}", "pro": "95% CI [{lo}, {hi}] · SE {se}"},

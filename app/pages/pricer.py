@@ -150,7 +150,9 @@ with right:
             if res.available:
                 diff = res.price - reference
                 tone = ""  # a numerical difference is neither good nor bad: keep it neutral
-                diff_txt = tx("pricer.vs_reference", diff=signed(diff, ctx.price_decimals + 2))
+                diff_val = (t("pips", x=signed(diff / ctx.pip, 2)) if ctx.is_fx
+                            else signed(diff, ctx.price_decimals + 2))
+                diff_txt = tx("pricer.vs_tree" if american else "pricer.vs_reference", diff=diff_val)
                 meta = []
                 if m is Method.MONTE_CARLO:
                     meta.append(tx("pricer.ci", lo=ctx.money(res.ci_low), hi=ctx.money(res.ci_high),
@@ -172,8 +174,9 @@ with right:
                 )
                 cls = "opl-method unavailable"
             st.html(
-                f'<div class="{cls}"><div class="opl-method-name">{html.escape(method_label(m))}</div>'
-                f'<div class="opl-method-desc">{html.escape(desc)}</div>{body}</div>'
+                f'<div class="{cls}"><div class="opl-method-head"><div class="opl-method-name">'
+                f'{html.escape(method_label(m))}</div>'
+                f'<div class="opl-method-desc">{html.escape(desc)}</div></div>{body}</div>'
             )
 
     available = [r.price for r in results.values() if r.available]
@@ -207,11 +210,12 @@ with right:
             diffs = [abs(v - ref) for m, v in vals.items() if math.isfinite(v)]
             row[t("pricer.greeks.col.maxdiff")] = max(diffs) if diffs else float("nan")
             rows.append(row)
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(rows).dropna(axis=1, how="all")  # drop methods that cannot price this contract
         num_cols = [c for c in df.columns if c != t("pricer.greeks.col.greek")]
         config = {c: st.column_config.NumberColumn(c, format="%.5f") for c in num_cols}
-        config[t("method.short.black_scholes")] = st.column_config.NumberColumn(
-            t("pricer.greeks.col.analytical"), format="%.5f")
+        if t("method.short.black_scholes") in df.columns:
+            config[t("method.short.black_scholes")] = st.column_config.NumberColumn(
+                t("pricer.greeks.col.analytical"), format="%.5f")
         config[t("pricer.greeks.col.maxdiff")] = st.column_config.NumberColumn(
             t("pricer.greeks.col.maxdiff"), format="%.2e", help=t("pricer.greeks.col.maxdiff_help"))
         st.dataframe(df, hide_index=True, width="stretch", column_config=config)

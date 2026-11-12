@@ -220,7 +220,7 @@ class Context:
             return "–"
         d = self.price_decimals if decimals is None else decimals
         if self.is_fx:
-            return f"{x:,.{d}f}"
+            return f"{x:,.{d}f}".replace("-", "−")
         sign = "−" if x < 0 else ""
         return f"{sign}${abs(x):,.{d}f}"
 

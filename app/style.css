@@ -125,12 +125,11 @@
   font-weight: 600;
   margin-bottom: 0.15rem;
 }
+.opl-method-head { min-height: 5.6rem; margin-bottom: 0.4rem; }
 .opl-method-desc {
   font-size: 0.78rem;
   opacity: 0.6;
   line-height: 1.4;
-  min-height: 4.2em;
-  margin-bottom: 0.6rem;
 }
 .opl-method-price {
   font-size: 1.55rem;

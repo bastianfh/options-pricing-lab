@@ -18,7 +18,7 @@ st.set_page_config(
     page_title=t("app.name"),
     page_icon=":material/candlestick_chart:",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 PAGES = {
@@ -30,7 +30,6 @@ PAGES = {
     "validation": st.Page("app/pages/validation.py", title=t("nav.validation"), icon=":material/verified:", url_path="validation"),
     "methods": st.Page("app/pages/methods.py", title=t("nav.methods"), icon=":material/menu_book:", url_path="methods"),
 }
-st.session_state["_pages"] = PAGES
 
 init_state()
 navigation = st.navigation(list(PAGES.values()), position="hidden")
