@@ -2,7 +2,7 @@
 name = "options-pricing-lab"
 version = "1.0.0"
 description = "An options pricing and risk library written from scratch, with an interactive Streamlit lab."
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
 
