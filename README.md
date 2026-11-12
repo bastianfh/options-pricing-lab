@@ -3,84 +3,71 @@
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://options-pricing-lab-bastianfh.streamlit.app/)
 [![tests](https://github.com/bastianfh/options-pricing-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/bastianfh/options-pricing-lab/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-4f46e5)
-![Streamlit](https://img.shields.io/badge/UI-Streamlit-4f46e5)
 ![License: MIT](https://img.shields.io/badge/license-MIT-4f46e5)
 
-**An options pricing and risk library written from scratch in NumPy/SciPy, with an interactive lab that prices every option four independent ways and proves they agree.**
+**An app that prices options four different ways and shows they all land on the same answer. I wrote the pricing maths myself instead of using an existing library.**
 
-**Live demo: [options-pricing-lab-bastianfh.streamlit.app](https://options-pricing-lab-bastianfh.streamlit.app/)**. No install needed. Add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the URL to open it in Pro mode.
+👉 **Try it live: [options-pricing-lab-bastianfh.streamlit.app](https://options-pricing-lab-bastianfh.streamlit.app/)** (nothing to install)
 
-![Pricer: four methods side by side with analytical vs numerical Greeks](docs/images/pricer-pro-light.png)
+![The Pricer page](docs/images/pricer-pro-light.png)
 
-## Headline result: every numerical method converges to Black-Scholes at the rate theory predicts
+## What it does
 
-![Convergence of the binomial tree, Monte Carlo and Crank-Nicolson to Black-Scholes](docs/images/convergence.png)
+You set up an option (stock or currency, call or put, strike, expiry, volatility) and the app tells you:
 
-| Method | Resolution | Theoretical order | Measured order | Error at finest resolution |
-|---|---|---|---|---|
-| Cox-Ross-Rubinstein binomial tree | N = 10 … 2,000 steps | 1 | **1.00** | 9.7 × 10⁻⁴ |
-| Crank-Nicolson finite differences | M = N = 25 … 800 | 2 | **1.99** | 5.0 × 10⁻⁶ |
-| Monte Carlo (standard error) | n = 10³ … 10⁶ paths | ½ | **0.50** | 2.9 × 10⁻³ (antithetic + control variate, ≈ 20× variance reduction) |
+- **What it's worth**, worked out four ways:
+  - **Black-Scholes:** the classic formula. Exact and instant. For currencies it uses Garman-Kohlhagen, the FX version.
+  - **Binomial tree:** splits time into small steps where the price can only go up or down, then works backwards from expiry.
+  - **Monte Carlo:** simulates thousands of possible futures and averages what the option pays.
+  - **Finite differences (Crank-Nicolson):** solves the Black-Scholes equation on a grid of prices and dates.
+- **The Greeks:** how the price reacts when the stock moves, volatility changes, time passes, or rates change.
+- **Implied volatility:** works backwards from a price to the volatility the market is assuming, and plots it as a 3D surface.
+- **Profit and loss** for common strategies like straddles, spreads and covered calls.
 
-*ATM European call, S = K = 100, T = 1, r = 5%, q = 2%, σ = 20%. Black-Scholes = 9.227006. Reproduce with `python scripts/make_figures.py` or on the app's Validation page.*
+There's a **Plain English / Pro** switch at the top of the sidebar. Plain English explains everything in everyday words; Pro shows the proper notation and extra detail. To open the app straight in Pro mode, add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
 
-## Features
+## The app's pages
 
-**Pricing engine** (`pricing/`, no UI code, no third-party pricing libraries)
-- **Black-Scholes-Merton** for European calls/puts with a dividend yield, and **Garman-Kohlhagen** for FX options (domestic and foreign rates)
-- **Cox-Ross-Rubinstein binomial tree** with European and **American** exercise
-- **Monte Carlo** with **antithetic variates** and a **control variate**, reporting standard errors and 95% confidence intervals
-- **Crank-Nicolson** PDE solver with Rannacher smoothing, payoff cell-averaging and American exercise
-- **Greeks** (Δ, Γ, ν, Θ, ρ): closed-form for Black-Scholes and finite differences for every numerical model, compared side by side
-- **Implied volatility** by Newton-Raphson with a bisection fallback, and a **3D implied volatility surface**
-- Multi-leg **strategy** payoffs and P&L, and **convergence studies** with empirical orders of convergence
-
-**Interactive app** (`app/`, Streamlit)
-- **Plain English / Pro switch** at the top of the sidebar. Plain English translates every term ("Spot (S)" becomes "Price of the asset today"), explains every result in one line and hides advanced settings. Pro shows notation, every parameter, diagnostics and equations. All wording lives in one file, [`app/content.py`](app/content.py).
-- **Pricer:** inputs on the left; the price, all four methods side by side and the Greeks table on the right
-- **Greeks explorer:** each Greek against spot and against time to expiry, plus a heatmap
-- **Payoff & P&L:** straddle, strangle, bull/bear spreads, covered call, protective put or custom legs; P&L at expiry, today and at any horizon
-- **Volatility surface:** interactive 3D surface, smile slices, term structure; upload your own quotes as CSV
-- **Validation:** convergence plots, error tables, a work-precision diagram, American tree vs PDE, Greeks and put-call parity checks
-- **Methods:** a concise write-up of each model with LaTeX equations
-- FX-aware: currency pairs, premiums in pips and per 1m notional
-- Designed light and dark themes, one shared Plotly chart theme, and a CVD-checked palette
+| Page | What's on it |
+|---|---|
+| **Home** | Quick price calculator and example scenarios |
+| **Pricer** | All four methods side by side, plus the Greeks |
+| **Greeks explorer** | Charts of how each Greek changes with the stock price and time |
+| **Payoff & P&L** | What a strategy makes or loses at expiry and before |
+| **Volatility surface** | 3D implied volatility surface and smile charts |
+| **Validation** | Proof the numbers are right (see below) |
+| **Methods** | Short explanation of each model, with the equations |
 
 <table>
 <tr>
-<td><img src="docs/images/validation-pro-light.png" alt="Validation page"><br><sub><b>Validation:</b> measured vs theoretical convergence</sub></td>
-<td><img src="docs/images/payoff-plain-light.png" alt="Payoff page in Plain English mode"><br><sub><b>Payoff & P&L</b> in Plain English mode</sub></td>
+<td><img src="docs/images/validation-pro-light.png" alt="Validation page"><br><sub><b>Validation</b></sub></td>
+<td><img src="docs/images/payoff-plain-light.png" alt="Payoff page"><br><sub><b>Payoff & P&L</b> (Plain English mode)</sub></td>
 </tr>
 <tr>
-<td><img src="docs/images/surface-pro-dark.png" alt="Volatility surface, dark mode"><br><sub><b>Implied volatility surface</b> (dark mode)</sub></td>
-<td><img src="docs/images/greeks-pro-dark.png" alt="Greeks explorer, dark mode"><br><sub><b>Greeks explorer</b> (dark mode)</sub></td>
+<td><img src="docs/images/surface-pro-dark.png" alt="Volatility surface"><br><sub><b>Volatility surface</b> (dark mode)</sub></td>
+<td><img src="docs/images/greeks-pro-dark.png" alt="Greeks explorer"><br><sub><b>Greeks explorer</b> (dark mode)</sub></td>
 </tr>
 </table>
 
-## Methods in brief
+## How I know the numbers are right
 
-Full derivations, implementation choices and references are in **[docs/methods.md](docs/methods.md)**.
+Black-Scholes gives an exact answer for simple options, so I can check the other three methods against it. Give each method more computing power (more steps, more simulations, a finer grid) and its error should shrink at a speed the theory predicts:
 
-**Black-Scholes-Merton / Garman-Kohlhagen.** With $\phi = \pm1$ for calls and puts and $q = r_f$ for FX:
+![Each method's error shrinking as it gets more computing power](docs/images/convergence.png)
 
-$$
-V = \phi\left[S e^{-qT} N(\phi d_1) - K e^{-rT} N(\phi d_2)\right],\qquad
-d_{1,2} = \frac{\ln(S/K) + (r - q \pm \tfrac12\sigma^2)T}{\sigma\sqrt T}
-$$
+| Method | What the theory says | What I measured |
+|---|---|---|
+| Binomial tree | double the steps → error halves | ✅ matches |
+| Finite differences | double the grid → error drops 4× | ✅ matches |
+| Monte Carlo | 4× the simulations → error halves | ✅ matches |
 
-**Binomial tree (CRR).** $u = e^{\sigma\sqrt{\Delta t}}$, $d = 1/u$, $p = \dfrac{e^{(r-q)\Delta t} - d}{u-d}$, and backward induction
-$V_{i,j} = e^{-r\Delta t}[pV_{i+1,j+1} + (1-p)V_{i+1,j}]$, taking $\max(V_{i,j}, \text{payoff})$ for American exercise.
+The Validation page in the app has the full charts and tables.
 
-**Monte Carlo.** Exact sampling $S_T = S_0 e^{(r-q-\sigma^2/2)T + \sigma\sqrt T Z}$; estimator $\hat V = e^{-rT}\overline{f(S_T)}$ with $\text{SE} = s/\sqrt n$. Control variate $X = e^{-rT}S_T$ with known mean $S_0e^{-qT}$:
-$\hat V_{cv} = \bar Y - \hat\beta(\bar X - S_0e^{-qT})$.
+There are also **315 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and more. They run automatically on GitHub every time I push code.
 
-**Crank-Nicolson.** In $x = \ln S$, $\tau = T - t$: $\;(I - \tfrac12\Delta\tau L)V^{n+1} = (I + \tfrac12\Delta\tau L)V^n$, where $L$ discretises $\tfrac12\sigma^2\partial_{xx} + (r-q-\tfrac12\sigma^2)\partial_x - r$; one tridiagonal solve per step, second order in space and time.
+## Run it on your own computer
 
-**Implied volatility.** $\sigma_{k+1} = \sigma_k - \dfrac{BS(\sigma_k) - V_{\text{mkt}}}{\nu(\sigma_k)}$ inside a shrinking bracket, falling back to bisection whenever Newton would leave it.
-
-## Run it locally
-
-Requires Python 3.12 or 3.13.
+You need **Python 3.12 or 3.13**.
 
 ```bash
 git clone https://github.com/bastianfh/options-pricing-lab.git
@@ -102,9 +89,9 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-The app opens at http://localhost:8501. Add `?mode=Pro` to the URL to open in Pro mode.
+It opens in your browser at http://localhost:8501. (On Windows, activate the environment with `.venv\Scripts\Activate.ps1` instead.)
 
-## Tests
+To run the tests:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -114,77 +101,33 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-315 checks (313 unit tests plus 2 doctests) run in about 4 seconds and on every push via [GitHub Actions](.github/workflows/tests.yml). They cover:
+## How the code is organised
 
-- **Textbook values:** Hull Examples 15.6, 19.1 and 21.1; Haug's dividend-yield and Garman-Kohlhagen examples
-- **No-arbitrage:** put-call parity, price bounds, American put ≥ European put, American call without dividends equals European
-- **Convergence:** each numerical method within tolerance of Black-Scholes, with measured orders of 1 (tree), 2 (PDE) and ½ (Monte Carlo SE)
-- **Monte Carlo statistics:** 95% CI coverage over 400 independent runs, 1/√n scaling, every variance-reduction technique lowers the SE
-- **Implied vol:** price → IV → price round trips across 160 strike/expiry/vol/type combinations, the bisection fallback, surface recovery
-- **Greeks:** numerical vs analytical for every model, parity relations and the Black-Scholes PDE identity $\Theta + (r-q)S\Delta + \tfrac12\sigma^2S^2\Gamma = rV$
+```
+pricing/            the maths: all four pricing methods, Greeks, implied volatility
+app/                the website: pages, styling, and all the text (content.py)
+tests/              automated tests
+docs/               detailed write-up of the maths (methods.md) and screenshots
+streamlit_app.py    starts the app
+```
 
-## Use the library directly
+The pricing code doesn't depend on the website at all, so you can use it on its own:
 
 ```python
-from pricing import OptionSpec, Method, price_all, greeks, implied_volatility, garman_kohlhagen_price
+from pricing import OptionSpec, price_all
 
-spec = OptionSpec(S=100, K=95, T=0.5, r=0.04, sigma=0.25, q=0.01, option_type="put", exercise="american")
-for method, result in price_all(spec).items():
-    print(method.value, result.price, result.reason)        # BS/MC report "european_only" for American puts
-
-print(greeks(spec, Method.FINITE_DIFFERENCE))               # grid delta/gamma, bumped vega/theta/rho
-print(garman_kohlhagen_price(1.085, 1.10, 0.25, 0.043, 0.025, 0.075, "call"))   # EUR/USD call
-print(implied_volatility(4.12, S=100, K=100, T=0.5, r=0.04))
+option = OptionSpec(S=100, K=95, T=0.5, r=0.04, sigma=0.25, option_type="put")
+for method, result in price_all(option).items():
+    print(method.value, round(result.price, 4))
 ```
 
-## Project structure
+Want the full maths, the equations, and why I made certain choices? See **[docs/methods.md](docs/methods.md)**.
 
-```
-pricing/                     pricing library (NumPy/SciPy only)
-├── models/
-│   ├── black_scholes.py     Black-Scholes-Merton, Garman-Kohlhagen
-│   ├── binomial.py          CRR tree, European + American, tree Greeks
-│   ├── monte_carlo.py       GBM Monte Carlo, antithetic + control variates
-│   └── finite_difference.py Crank-Nicolson with Rannacher start
-├── greeks.py                analytical and bump-and-reprice Greeks
-├── implied_vol.py           Newton/bisection IV solver, surfaces
-├── strategies.py            multi-leg payoff, P&L, risk metrics
-├── convergence.py           convergence studies, empirical order
-├── engine.py                one API across all methods
-└── utils.py                 shared types, validation, payoffs
-app/
-├── content.py               all user-facing wording (Plain English + Pro)
-├── theme.py                 palette and shared Plotly chart theme
-├── ui.py                    sidebar, mode toggle, inputs, cards
-├── style.css                custom CSS on top of the Streamlit theme
-└── pages/                   home, pricer, greeks, payoff, surface, validation, methods
-tests/                       pytest suite
-docs/                        methods write-up, development plan, images
-scripts/                     README figure and screenshot tooling
-streamlit_app.py             entry point
-.streamlit/config.toml       light and dark themes
-```
+## What I learned
 
-Design and scope decisions are recorded in [docs/development-plan.md](docs/development-plan.md).
+This project connects two things I care about: the options theory I learn in class and the FX markets I trade.
 
-## Deploy to Streamlit Community Cloud
-
-The app is live at **https://options-pricing-lab-bastianfh.streamlit.app/**. To deploy your own copy (e.g. from a fork): `streamlit_app.py` is the default entry point, `requirements.txt` is pinned, and `.streamlit/config.toml` carries the theme.
-
-1. Push the repo to GitHub and make it public (or grant Streamlit access to it).
-2. Sign in at [share.streamlit.io](https://share.streamlit.io) with your GitHub account.
-3. Click **Create app**, then **Deploy a public app from GitHub**.
-4. Choose repository `bastianfh/options-pricing-lab`, your deployment branch, and main file path `streamlit_app.py`.
-5. Open **Advanced settings** and set **Python version** to **3.12** or **3.13** (NumPy 2.5 needs ≥ 3.12).
-6. Optionally pick a custom subdomain, then click **Deploy**.
-
-No secrets or environment variables are needed.
-
-## What I learned / next steps
-
-This project grew out of a gap I kept noticing between two parts of my life: the options theory I was learning in class, and the FX markets I trade. Building the pricing engine from scratch forced me to connect the two.
-
-### From formulas in class to models I can test
+### What building it taught me
 
 Building the formula four different ways has taught me a lot about the fact that these mathematical equations are far more than just a derivation. It also helped me visualize concepts that I have struggled with in the past. Although I have a significant amount of experience trading options, visualizing a trade in a bite-sized way is often extremely helpful rather than trying to number-crunch on the go.
 
@@ -192,14 +135,14 @@ Building the formula four different ways has taught me a lot about the fact that
 
 Next, I want to learn more about how to calibrate models to market prices, and how to actually make use of this in personal trading. I also want to look more at the potential of hedging.
 
-**Next steps**
-- PSOR or a penalty method for American options, to restore second order near the exercise boundary
-- Leisen-Reimer trees, for smooth O(1/N²) convergence without oscillation
-- Barrier and Asian options (Monte Carlo with Brownian-bridge correction)
-- Local volatility (Dupire) or Heston calibrated to the implied vol surface
-- An arbitrage-free SVI fit for the surface, and FX delta-based strike conventions (25Δ risk reversals and butterflies)
-- Live FX and equity quotes for the volatility surface
+## Ideas for later
+
+- Better handling of American options (options you can exercise early)
+- Exotic options like Asian and barrier options
+- Volatility models where volatility isn't constant (e.g. Heston), fitted to real market prices
+- FX-style quoting (25-delta risk reversals and butterflies)
+- Live market data instead of typing prices in
 
 ## License
 
-[MIT](LICENSE). For education and research; model prices are not trading advice.
+[MIT](LICENSE). Built for learning, not trading advice.
