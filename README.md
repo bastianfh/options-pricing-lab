@@ -1,5 +1,6 @@
 # Options Pricing Lab
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://options-pricing-lab-bastianfh.streamlit.app/)
 [![tests](https://github.com/bastianfh/options-pricing-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/bastianfh/options-pricing-lab/actions/workflows/tests.yml)
 ![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-4f46e5)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-4f46e5)
@@ -7,7 +8,7 @@
 
 **An options pricing and risk library written from scratch in NumPy/SciPy, with an interactive lab that prices every option four independent ways and proves they agree.**
 
-<!-- Live demo: add your Streamlit Community Cloud URL here once deployed -->
+**Live demo: [options-pricing-lab-bastianfh.streamlit.app](https://options-pricing-lab-bastianfh.streamlit.app/)**. No install needed. Add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the URL to open it in Pro mode.
 
 ![Pricer: four methods side by side with analytical vs numerical Greeks](docs/images/pricer-pro-light.png)
 
@@ -168,15 +169,14 @@ Design and scope decisions are recorded in [docs/development-plan.md](docs/devel
 
 ## Deploy to Streamlit Community Cloud
 
-The repo is ready to deploy as is: `streamlit_app.py` is the default entry point, `requirements.txt` is pinned, and `.streamlit/config.toml` carries the theme.
+The app is live at **https://options-pricing-lab-bastianfh.streamlit.app/**. To deploy your own copy (e.g. from a fork): `streamlit_app.py` is the default entry point, `requirements.txt` is pinned, and `.streamlit/config.toml` carries the theme.
 
 1. Push the repo to GitHub and make it public (or grant Streamlit access to it).
 2. Sign in at [share.streamlit.io](https://share.streamlit.io) with your GitHub account.
 3. Click **Create app**, then **Deploy a public app from GitHub**.
 4. Choose repository `bastianfh/options-pricing-lab`, your deployment branch, and main file path `streamlit_app.py`.
 5. Open **Advanced settings** and set **Python version** to **3.12** or **3.13** (NumPy 2.5 needs ≥ 3.12).
-6. Optionally pick a custom subdomain (e.g. `options-pricing-lab`), then click **Deploy**.
-7. Paste the resulting URL into the "Live demo" line at the top of this README.
+6. Optionally pick a custom subdomain, then click **Deploy**.
 
 No secrets or environment variables are needed.
 
