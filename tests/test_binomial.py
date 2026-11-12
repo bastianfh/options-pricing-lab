@@ -93,3 +93,7 @@ def test_tree_greeks_match_black_scholes() -> None:
     assert gamma == pytest.approx(exact.gamma, abs=1e-4)
     assert theta == pytest.approx(exact.theta, abs=0.02)
     assert price == pytest.approx(binomial_price(100, 100, 1.0, 0.05, 0.2, 0.01, "put", n_steps=1000))
+
+
+def test_returns_python_float() -> None:
+    assert type(binomial_price(**BASE, n_steps=10)) is float

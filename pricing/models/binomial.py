@@ -105,7 +105,7 @@ def binomial_price(
     if sigma <= 0.0:
         raise ValueError("The binomial tree requires sigma > 0.")
 
-    return _backward_induction(S, K, T, r, sigma, q, opt, style, n_steps)[0][0]
+    return float(_backward_induction(S, K, T, r, sigma, q, opt, style, n_steps)[0][0])
 
 
 def _backward_induction(
