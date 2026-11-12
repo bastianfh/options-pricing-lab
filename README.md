@@ -186,23 +186,11 @@ This project grew out of a gap I kept noticing between two parts of my life: the
 
 ### From formulas in class to models I can test
 
-In my coursework, Black-Scholes first appeared as a formula to apply. Implementing it four different ways showed me it is really one idea seen from several angles. The binomial tree is risk-neutral pricing done one step at a time. Monte Carlo is the same expectation estimated by simulation. The Crank-Nicolson solver works directly on the partial differential equation, and the closed form is where all three end up. Watching the tree, the simulation and the grid converge to the same number made risk-neutral valuation concrete in a way a derivation never had.
-
-It also made results I had memorised testable. Put-call parity, the bounds on option prices and the identity Θ + (r−q)SΔ + ½σ²S²Γ = rV are now unit tests, not lines in my notes. The statistics from class became tools too: the central limit theorem is why a Monte Carlo price comes with a standard error and a confidence interval. I checked that those 95% intervals really contain the true price about 95% of the time.
-
-### From theory to my FX trading
-
-Garman-Kohlhagen was the clearest bridge. Seeing that a currency pair is priced exactly like a stock paying a dividend, with the foreign interest rate as the dividend yield, changed how I think about the interest-rate differential behind every FX position. The same carry that drives forward points also moves option prices, and rho now has an intuitive meaning for me.
-
-The Greeks became practical as well. Expressing an option's value and its sensitivities in pips, and per million of notional, turned abstract derivatives into numbers I can compare with my position sizes. Above all, the volatility surface showed me why markets quote options in volatility rather than price. Black-Scholes assumes one constant volatility, but real smiles are not flat. Implied volatility is a quoting convention that corrects for the model's wrong assumption, and I now read a vol quote as the market's view on the size of moves, not as a fact about the model.
-
-### Why every number needs to be validated
-
-The most important lesson came from the bugs. A tree's gamma was 26% off because the price wobbles with spot. A Monte Carlo standard error was overstated until I computed it on antithetic pairs instead of individual paths. The PDE solver converged erratically until I smoothed the payoff at the strike. In each case the method looked reasonable, and only checking it against theory and an independent method exposed the problem. That habit carries straight into trading: a single model output is a hypothesis, not an answer, and it deserves the same scepticism as a trade idea.
+Building the formula four different ways has taught me a lot about the fact that these mathematical equations are far more than just a derivation. It also helped me visualize concepts that I have struggled with in the past. Although I have a significant amount of experience trading options, visualizing a trade in a bite-sized way is often extremely helpful rather than trying to number-crunch on the go.
 
 ### What I want to learn next
 
-Building this made clear where the simple models stop. Constant volatility cannot explain the smiles I see in FX, and real hedging is discrete and costly. I want to study stochastic volatility models such as Heston, how they are calibrated to market surfaces, and how hedging error behaves in practice. Those are the questions I hope to pursue in a Master of Quantitative Finance.
+Next, I want to learn more about how to calibrate models to market prices, and how to actually make use of this in personal trading. I also want to look more at the potential of hedging.
 
 **Next steps**
 - PSOR or a penalty method for American options, to restore second order near the exercise boundary
