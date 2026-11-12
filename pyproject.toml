@@ -7,6 +7,6 @@ readme = "README.md"
 license = { text = "MIT" }
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "pricing"]
 pythonpath = ["."]
-addopts = "-q"
+addopts = "-q --doctest-modules"
