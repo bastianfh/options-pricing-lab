@@ -165,7 +165,7 @@ with right:
                        f"<br>{tx('vs.z_vol')}: %{{z:.2f}}<extra></extra>"),
         lighting=dict(ambient=0.75, diffuse=0.5, specular=0.08, roughness=0.9),
     ))
-    style_scene(fig, x_title=tx("vs.x_moneyness"), y_title=tx("vs.y_expiry"), z_title=tx("vs.z_vol"), height=520)
+    style_scene(fig, x_title=tx("vs.x_moneyness"), y_title=tx("vs.y_expiry"), z_title=tx("vs.z_vol"), height=480)
     show(fig, key="vs_chart_surface")
 
     # -------------------------------------------------------------- smiles

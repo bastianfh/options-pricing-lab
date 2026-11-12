@@ -182,7 +182,7 @@ def style_scene(fig: go.Figure, *, x_title: str, y_title: str, z_title: str, hei
             xaxis=dict(axis, title_text=x_title),
             yaxis=dict(axis, title_text=y_title),
             zaxis=dict(axis, title_text=z_title),
-            camera=dict(eye=dict(x=1.55, y=-1.55, z=0.85)),
+            camera=dict(eye=dict(x=1.3, y=-1.45, z=0.5), center=dict(x=0, y=0, z=-0.15)),
             aspectmode="manual",
             aspectratio=dict(x=1.25, y=1.0, z=0.7),
         ),
