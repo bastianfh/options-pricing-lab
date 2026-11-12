@@ -24,7 +24,14 @@ def test_round_trip_price_to_vol_to_price(option_type: str, K: float, T: float, 
     price = black_scholes_price(S, K, T, r, sigma, q, option_type)
     lower, _ = price_bounds(S, K, T, r, q, option_type)
     if price - lower < 1e-9:
-        pytest.skip("No time value left: volatility is not identifiable at double precision.")
+        # No time value left at double precision, so sigma is not identifiable. The solver must either
+        # reject the price as sitting on the no-arbitrage bound or return a sigma that reproduces it.
+        try:
+            iv = implied_volatility(price, S, K, T, r, q, option_type)
+        except ValueError:
+            return
+        assert black_scholes_price(S, K, T, r, iv, q, option_type) == pytest.approx(price, abs=1e-9)
+        return
     iv = implied_volatility(price, S, K, T, r, q, option_type)
     assert black_scholes_price(S, K, T, r, iv, q, option_type) == pytest.approx(price, abs=1e-8)
     if price - lower > 1e-4:  # enough time value for sigma itself to be well determined
