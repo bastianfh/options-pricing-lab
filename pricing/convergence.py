@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence, TypeVar
 
 import numpy as np
 
@@ -29,6 +29,8 @@ from pricing.models.binomial import binomial_price
 from pricing.models.black_scholes import black_scholes_price
 from pricing.models.finite_difference import finite_difference_price
 from pricing.models.monte_carlo import monte_carlo_price
+
+T_ = TypeVar("T_")
 
 
 def empirical_order(resolution: Sequence[float], errors: Sequence[float]) -> float:
@@ -62,6 +64,24 @@ class ConvergenceStudy:
         return empirical_order(self.resolution, self.errors)
 
 
+def _timed(fn: Callable[[], T_], budget_ms: float = 25.0, max_repeats: int = 7) -> tuple[T_, float]:
+    """Run ``fn`` and return ``(result, runtime_ms)`` using the best of several repeats.
+
+    Cheap calls are repeated until ``budget_ms`` is spent (at most
+    ``max_repeats`` times) and the minimum is reported, the usual way to strip
+    scheduler jitter and warm-up from micro-benchmarks (cf. Python's ``timeit``).
+    """
+    best, spent, result = float("inf"), 0.0, None
+    for _ in range(max_repeats):
+        t0 = time.perf_counter()
+        result = fn()
+        elapsed = (time.perf_counter() - t0) * 1e3
+        best, spent = min(best, elapsed), spent + elapsed
+        if spent >= budget_ms:
+            break
+    return result, best
+
+
 def _european(spec: OptionSpec) -> float:
     return float(black_scholes_price(spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type))
 
@@ -70,9 +90,10 @@ def binomial_study(spec: OptionSpec, steps: Sequence[int]) -> ConvergenceStudy:
     """Run the CRR tree at each number of steps (European exercise, reference = Black-Scholes)."""
     prices, times = [], []
     for n in steps:
-        t0 = time.perf_counter()
-        prices.append(binomial_price(spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type, "european", int(n)))
-        times.append((time.perf_counter() - t0) * 1e3)
+        value, ms = _timed(lambda: binomial_price(
+            spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type, "european", int(n)))
+        prices.append(value)
+        times.append(ms)
     return ConvergenceStudy("binomial", np.asarray(steps), np.asarray(prices), _european(spec), np.asarray(times))
 
 
@@ -80,13 +101,10 @@ def pde_study(spec: OptionSpec, grid_sizes: Sequence[int]) -> ConvergenceStudy:
     """Run Crank-Nicolson with ``M = N = n`` for each ``n`` (reference = Black-Scholes)."""
     prices, times = [], []
     for n in grid_sizes:
-        t0 = time.perf_counter()
-        prices.append(
-            finite_difference_price(
-                spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type, "european", int(n), int(n)
-            )
-        )
-        times.append((time.perf_counter() - t0) * 1e3)
+        value, ms = _timed(lambda: finite_difference_price(
+            spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type, "european", int(n), int(n)))
+        prices.append(value)
+        times.append(ms)
     return ConvergenceStudy("finite_difference", np.asarray(grid_sizes), np.asarray(prices), _european(spec), np.asarray(times))
 
 
@@ -122,12 +140,11 @@ def monte_carlo_study(spec: OptionSpec, path_counts: Sequence[int], seed: int = 
     for name, (anti, cv) in MC_VARIANTS.items():
         prices, ses, times = [], [], []
         for n in path_counts:
-            t0 = time.perf_counter()
-            res = monte_carlo_price(
+            res, ms = _timed(lambda: monte_carlo_price(
                 spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type,
                 n_paths=int(n), antithetic=anti, control_variate=cv, seed=seed,
-            )
-            times.append((time.perf_counter() - t0) * 1e3)
+            ))
+            times.append(ms)
             prices.append(res.price)
             ses.append(res.std_error)
         studies[name] = ConvergenceStudy(
