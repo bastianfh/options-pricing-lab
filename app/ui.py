@@ -6,6 +6,7 @@ All wording comes from :mod:`app.content`.
 
 from __future__ import annotations
 
+import ast
 import html
 import math
 from dataclasses import dataclass
@@ -15,7 +16,6 @@ from typing import Callable, Optional
 import streamlit as st
 
 from app.content import CURRENCY_SYMBOLS, FX_PAIRS, PLAIN, PRO, t
-from app.theme import palette
 from pricing.engine import NumericalSettings, OptionSpec
 
 REPO_URL = "https://github.com/bastianfh/options-pricing-lab"
@@ -44,58 +44,109 @@ def tx(key: str, **fmt: object) -> str:
 # ---------------------------------------------------------------------------
 
 def inject_css() -> None:
-    """Load ``style.css`` and define colour variables for the active theme."""
-    p = palette()
+    """Load ``style.css`` (all tokens are static: the app is locked to one dark palette)."""
     css = (Path(__file__).parent / "style.css").read_text()
-    variables = (
-        ":root{"
-        f"--opl-accent:{p.accent};--opl-accent-soft:{p.accent_soft};"
-        f"--opl-gain:{p.gain};--opl-loss:{p.loss};"
-        f"--opl-gain-soft:{p.gain_fill};--opl-loss-soft:{p.loss_fill};"
-        f"--opl-panel:{p.card};--opl-muted:{p.muted};--opl-rule:{p.rule};"
-        "}"
-    )
-    st.html(f"<style>{variables}{css}</style>")
+    st.html(f"<style>{css}</style>")
 
 
-def render_sidebar(pages: dict[str, st.Page]) -> None:
-    """Mode toggle (always first), page links, footer."""
-    with st.sidebar:
+GREEK_LOWER = set("αβγδεζηθικλμνξοπρσςτυφχψω")
+
+
+def upper(text: str) -> str:
+    """Upper-case ``text`` for micro-labels, keeping Greek letters and anything in [brackets] as written.
+
+    CSS ``text-transform`` would turn σ into Σ and r_d into R_D, so labels are cased here instead.
+    """
+    out, depth = [], 0
+    for ch in text:
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth = max(depth - 1, 0)
+        out.append(ch if depth or ch in GREEK_LOWER else ch.upper())
+    return "".join(out)
+
+
+def lbl(key: str, **fmt: object) -> str:
+    """Wording for ``key`` in the current mode, styled as an uppercase hardware label."""
+    return upper(tx(key, **fmt))
+
+
+def _next_index() -> int:
+    st.session_state["_mod_idx"] = st.session_state.get("_mod_idx", 0) + 1
+    return st.session_state["_mod_idx"]
+
+
+def reset_module_index() -> None:
+    """Restart module numbering (01, 02, ...) at the top of every page run."""
+    st.session_state["_mod_idx"] = 0
+
+
+NAV_ORDER = ["pricer", "greeks", "payoff", "surface", "validation", "methods"]
+
+
+def _on_nav() -> None:
+    target = st.session_state.get("nav_tool")
+    if target:
+        st.session_state["_goto"] = target
+
+
+def render_topbar(current: str) -> None:
+    """Telemetry bar: wordmark, mechanical tool tabs, live parameter readout, status LED, Plain/Pro switch."""
+    s = st.session_state
+    st.session_state["nav_tool"] = current
+    american = s.get("in_exercise") == "american"
+    fx = s.get("in_asset") == "fx"
+    model = "CRR/PDE" if american else ("GK" if fx else "BSM")
+    with st.container(horizontal=True, key="topbar", vertical_alignment="center", gap="small"):
+        st.html('<div class="opl-wordmark">OPL<b>/</b>LAB</div>')
         st.segmented_control(
-            t("mode.label"),
+            "Tool",
+            options=NAV_ORDER,
+            format_func=lambda k: f"[{NAV_ORDER.index(k) + 1:02d}] {upper(t(f'navshort.{k}'))}",
+            key="nav_tool",
+            required=True,
+            on_change=_on_nav,
+            label_visibility="collapsed",
+        )
+        st.html(
+            '<div class="opl-telemetry">'
+            f"<span>MODEL <b>{model}</b></span>"
+            f"<span>r <b>{float(s.get('in_r', 0)):.2f}%</b></span>"
+            f"<span>σ <b>{float(s.get('in_vol', 0)):.1f}%</b></span>"
+            f"<span>T <b>{int(s.get('in_days', 0))}d</b></span>"
+            '<span><i class="opl-led"></i><b>LIVE</b></span>'
+            "</div>"
+        )
+        st.space("stretch")
+        st.segmented_control(
+            upper(t("mode.label")),
             options=[PLAIN, PRO],
             key="mode",
             default=PLAIN,
             required=True,
             bind="query-params",
             help=t("mode.help"),
-            width="stretch",
-        )
-        st.caption(tx("mode.caption"))
-        st.html('<div class="opl-sidebar-rule"></div>')
-        for page in pages.values():
-            st.page_link(page, width="stretch")
-        st.html(
-            '<div class="opl-sidebar-footer">'
-            f"<p>{html.escape(t('sidebar.footer'))}</p>"
-            f'<p><a href="{REPO_URL}" target="_blank" rel="noopener">{html.escape(t("sidebar.source"))}</a></p>'
-            "</div>"
+            label_visibility="collapsed",
         )
 
 
 def page_header(title_key: str, lede_key: str) -> None:
-    """Page title block: large title and a one-line lede."""
+    """Compact context line: page code and a one-line description (no hero)."""
     st.html(
-        '<div class="opl-header">'
-        f"<h1>{html.escape(tx(title_key))}</h1>"
-        f'<p class="opl-lede">{html.escape(tx(lede_key))}</p></div>'
+        '<div class="opl-context">'
+        f"<b>{html.escape(upper(tx(title_key)))}</b>"
+        f'<span class="lede">{html.escape(tx(lede_key))}</span></div>'
     )
 
 
 def section(title: str, lede: Optional[str] = None) -> None:
-    """Section heading with optional muted lede."""
+    """Numbered module header (``02 // TITLE``) on a hairline rule, with an optional short note."""
     lede_html = f'<p class="opl-section-lede">{html.escape(lede)}</p>' if lede else ""
-    st.html(f'<div class="opl-section"><h3>{html.escape(title)}</h3>{lede_html}</div>')
+    st.html(
+        f'<div class="opl-section"><div class="opl-module-title"><i>{_next_index():02d}</i> // '
+        f"{html.escape(upper(title))}</div>{lede_html}</div>"
+    )
 
 
 def explain(text: str) -> None:
@@ -108,9 +159,27 @@ def stat(label: str, value: str, sub: str = "", tone: str = "", size: str = "md"
     sub_html = f'<div class="opl-stat-sub">{sub}</div>' if sub else ""
     return (
         f'<div class="opl-stat opl-stat-{size}">'
-        f'<div class="opl-stat-label">{html.escape(label)}</div>'
+        f'<div class="opl-stat-label">{html.escape(upper(label))}</div>'
         f'<div class="opl-stat-value {tone}">{html.escape(value)}</div>{sub_html}</div>'
     )
+
+
+def cells(items: list[tuple[str, str, str, str]], columns: Optional[int] = None, extra_class: str = "") -> str:
+    """HTML for an exposed hairline grid of readout cells.
+
+    Each item is ``(label, value, sub, tone)`` with ``tone`` in {"", "pos", "neg", "acc", "vol"}.
+    Adjacent cells share a single 1px rule, like modules on a hardware panel.
+    """
+    n = columns or len(items)
+    body = "".join(
+        f'<div class="opl-cell"><div class="k">{html.escape(upper(k))}</div>'
+        f'<div class="v {tone}">{html.escape(v)}</div>'
+        + (f'<div class="s">{html.escape(sub)}</div>' if sub else "")
+        + "</div>"
+        for k, v, sub, tone in items
+    )
+    return (f'<div class="opl-grid {extra_class}" style="grid-template-columns:repeat({n}, minmax(0, 1fr))">'
+            f"{body}</div>")
 
 
 def card(key: str) -> st.delta_generator.DeltaGenerator:
@@ -124,7 +193,8 @@ def panel(key: str) -> st.delta_generator.DeltaGenerator:
 
 
 def panel_title(text: str) -> None:
-    st.html(f'<div class="opl-panel-title">{html.escape(text)}</div>')
+    """Numbered header for a control bay, e.g. ``01 // PARAMETERS``."""
+    st.html(f'<div class="opl-panel-title"><i>{_next_index():02d}</i> // {html.escape(upper(text))}</div>')
 
 
 def agreement_html(value: str, reference: str) -> tuple[str, int]:
@@ -284,9 +354,9 @@ def input_panel(
     pro = is_pro()
 
     st.segmented_control(
-        tx("in.asset.label"),
+        lbl("in.asset.label"),
         options=["stock", "fx"],
-        format_func=lambda v: tx(f"in.asset.{v}"),
+        format_func=lambda v: upper(tx(f"in.asset.{v}")),
         key="in_asset",
         required=True,
         help=tx("in.asset.help"),
@@ -297,7 +367,7 @@ def input_panel(
     ctx = context()
     if ctx.is_fx:
         st.selectbox(
-            tx("in.pair.label"), list(FX_PAIRS), key="in_pair", help=tx("in.pair.help"),
+            lbl("in.pair.label"), list(FX_PAIRS), key="in_pair", help=tx("in.pair.help"),
             on_change=_on_pair_change, persist_state="session",
         )
         ctx = context()
@@ -305,9 +375,9 @@ def input_panel(
     if contract:
         if option_type:
             st.segmented_control(
-                tx("in.option_type.label"),
+                lbl("in.option_type.label"),
                 options=["call", "put"],
-                format_func=lambda v: tx(f"in.option_type.{v}"),
+                format_func=lambda v: upper(tx(f"in.option_type.{v}")),
                 key="in_option_type",
                 required=True,
                 help=tx("in.option_type.help"),
@@ -316,9 +386,9 @@ def input_panel(
             )
         if exercise:
             st.segmented_control(
-                tx("in.exercise.label"),
+                lbl("in.exercise.label"),
                 options=["european", "american"],
-                format_func=lambda v: tx(f"in.exercise.{v}"),
+                format_func=lambda v: upper(tx(f"in.exercise.{v}")),
                 key="in_exercise",
                 required=True,
                 help=tx("in.exercise.help"),
@@ -328,20 +398,20 @@ def input_panel(
 
     fmt = f"%.{4 if ctx.is_fx and ctx.pip < 0.01 else 2}f"
     st.number_input(
-        tx("in.S.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_S",
+        lbl("in.S.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_S",
         help=tx("in.S.help"), persist_state="session",
     )
     if strike:
         st.number_input(
-            tx("in.K.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_K",
+            lbl("in.K.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_K",
             help=tx("in.K.help"), persist_state="session",
         )
     st.number_input(
-        tx("in.days.label"), min_value=1, max_value=3650, step=1, key="in_days",
+        lbl("in.days.label"), min_value=1, max_value=3650, step=1, key="in_days",
         help=tx("in.days.help"), persist_state="session",
     )
     st.number_input(
-        tx("in.vol.label"), min_value=0.5, max_value=300.0, step=0.5, format="%.1f", key="in_vol",
+        lbl("in.vol.label"), min_value=0.5, max_value=300.0, step=0.5, format="%.1f", key="in_vol",
         help=tx("in.vol.help"), persist_state="session",
     )
 
@@ -349,21 +419,21 @@ def input_panel(
     names = dict(base=ctx.base, quote=ctx.quote)
     if ctx.is_fx or pro:
         st.number_input(
-            tx(f"{rate_key}.label", **names), min_value=-5.0, max_value=50.0, step=0.25, format="%.2f",
+            lbl(f"{rate_key}.label", **names), min_value=-5.0, max_value=50.0, step=0.25, format="%.2f",
             key="in_r", help=tx(f"{rate_key}.help"), persist_state="session",
         )
         st.number_input(
-            tx(f"{carry_key}.label", **names), min_value=-5.0, max_value=50.0, step=0.25, format="%.2f",
+            lbl(f"{carry_key}.label", **names), min_value=-5.0, max_value=50.0, step=0.25, format="%.2f",
             key="in_q", help=tx(f"{carry_key}.help"), persist_state="session",
         )
     else:
         with st.expander(tx("inputs.numerics")):
             st.number_input(
-                tx("in.r.label"), min_value=-5.0, max_value=50.0, step=0.25, format="%.2f",
+                lbl("in.r.label"), min_value=-5.0, max_value=50.0, step=0.25, format="%.2f",
                 key="in_r", help=tx("in.r.help"), persist_state="session",
             )
             st.number_input(
-                tx("in.q.label"), min_value=0.0, max_value=50.0, step=0.25, format="%.2f",
+                lbl("in.q.label"), min_value=0.0, max_value=50.0, step=0.25, format="%.2f",
                 key="in_q", help=tx("in.q.help"), persist_state="session",
             )
 
@@ -376,18 +446,18 @@ def input_panel(
         with st.expander(tx("inputs.numerics"), expanded=False):
             st.caption(tx("inputs.numerics_hint"))
             n1, n2 = st.columns(2)
-            n1.number_input(tx("in.steps.label"), 10, 5000, step=50, key="in_steps",
+            n1.number_input(lbl("in.steps.label"), 10, 5000, step=50, key="in_steps",
                             help=tx("in.steps.help"), persist_state="session")
-            n2.number_input(tx("in.grid.label"), 20, 2000, step=50, key="in_grid",
+            n2.number_input(lbl("in.grid.label"), 20, 2000, step=50, key="in_grid",
                             help=tx("in.grid.help"), persist_state="session")
-            st.select_slider(tx("in.paths.label"), [1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000],
+            st.select_slider(lbl("in.paths.label"), [1_000, 5_000, 10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000],
                              key="in_paths", format_func=lambda v: f"{v:,}", help=tx("in.paths.help"),
                              persist_state="session")
             v1, v2 = st.columns(2)
-            v1.toggle(tx("in.antithetic.label"), key="in_antithetic", help=tx("in.antithetic.help"),
+            v1.toggle(lbl("in.antithetic.label"), key="in_antithetic", help=tx("in.antithetic.help"),
                       persist_state="session")
-            v2.toggle(tx("in.cv.label"), key="in_cv", help=tx("in.cv.help"), persist_state="session")
-            st.number_input(tx("in.seed.label"), 0, 2**31 - 1, step=1, key="in_seed",
+            v2.toggle(lbl("in.cv.label"), key="in_cv", help=tx("in.cv.help"), persist_state="session")
+            st.number_input(lbl("in.seed.label"), 0, 2**31 - 1, step=1, key="in_seed",
                             help=tx("in.seed.help"), persist_state="session")
         s = st.session_state
         settings = NumericalSettings(
@@ -455,7 +525,7 @@ def preset_buttons() -> None:
     with st.container(horizontal=True, gap="small"):
         for name in PRESETS:
             st.button(
-                tx(f"preset.{name}.title"),
+                upper(tx(f"preset.{name}.title")),
                 key=f"preset_{name}",
                 on_click=_load_preset,
                 args=(name,),
@@ -473,9 +543,9 @@ def _on_preset_pill() -> None:
 def preset_pills() -> None:
     """Compact preset selector (one row of pills)."""
     st.pills(
-        tx("presets.title"),
+        lbl("presets.title"),
         options=list(PRESETS),
-        format_func=lambda n: tx(f"preset.{n}.title"),
+        format_func=lambda n: upper(tx(f"preset.{n}.title")),
         key="preset_pill",
         on_change=_on_preset_pill,
         help=tx("presets.subtitle"),
@@ -502,8 +572,6 @@ def count_tests() -> int:
     ``@pytest.mark.parametrize`` decorators. Matches ``pytest --collect-only``
     for this suite, which only uses literal parameter lists.
     """
-    import ast
-
     total = 0
     for path in (Path(__file__).resolve().parent.parent / "tests").glob("test_*.py"):
         tree = ast.parse(path.read_text())
@@ -523,8 +591,6 @@ def count_tests() -> int:
 
 def _module_list_length(tree: "ast.Module", name: str) -> int:
     """Length of a module-level list/tuple literal ``name = [...]`` (1 if not found)."""
-    import ast
-
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(getattr(t_, "id", None) == name for t_ in node.targets):
             if isinstance(node.value, (ast.List, ast.Tuple)):
