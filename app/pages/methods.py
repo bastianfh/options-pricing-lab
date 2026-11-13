@@ -7,13 +7,13 @@ import html
 import streamlit as st
 
 from app.content import METHODS, t
-from app.ui import card, is_pro, page_header, tx
+from app.ui import is_pro, page_header, tx
 
 page_header("methods.title", "methods.lede")
 
 tabs = st.tabs([m["title"] for m in METHODS])
 for tab, method in zip(tabs, METHODS):
-    with tab, card(f"method_doc_{method['title'][:12].replace(' ', '_')}"):
+    with tab:
         if is_pro():
             st.markdown(method["pro"])
         else:

@@ -13,6 +13,8 @@ import streamlit as st
 from app.content import FX_PAIRS, t
 from app.theme import colorscale, palette, show, style_figure, style_scene
 from app.ui import (
+    panel,
+    panel_title,
     _on_asset_change,
     _on_pair_change,
     cached,
@@ -39,8 +41,8 @@ page_header("vs.title", "vs.lede")
 init_state()
 
 left, right = st.columns([1, 2.3], gap="large")
-with left, card("vs_inputs"):
-    st.html(f'<div class="opl-card-title">{html.escape(tx("vs.source"))}</div>')
+with left, panel("vs_inputs"):
+    panel_title(tx("vs.source"))
     source = "synthetic"
     if is_pro():
         source = st.segmented_control(
@@ -57,8 +59,8 @@ with left, card("vs_inputs"):
         st.slider(tx("vs.curv"), 0.0, 0.30, 0.06, 0.01, key="vs_curv", help=tx("vs.curv.help"), persist_state="session")
         st.slider(tx("vs.term"), -0.15, 0.15, 0.03, 0.01, key="vs_term", help=tx("vs.term.help"), persist_state="session")
 
-    st.html('<div class="opl-sidebar-rule" style="margin:0.6rem 0 0.9rem 0"></div>')
-    st.html(f'<div class="opl-card-title">{html.escape(tx("inputs.market"))}</div>')
+    st.html('<div style="height:0.8rem"></div>')
+    panel_title(tx("inputs.market"))
     st.segmented_control(
         tx("in.asset.label"), ["stock", "fx"], format_func=lambda v: tx(f"in.asset.{v}"), key="in_asset",
         required=True, on_change=_on_asset_change, persist_state="session", width="stretch",
@@ -203,7 +205,7 @@ with right:
     # ---------------------------------------------------------- diagnostics
     if is_pro() and diag is not None:
         section(t("vs.diag.title"))
-        with card("vs_diag"):
+        with st.container(key="vs_diag"):
             d1, d2, d3, d4 = st.columns(4)
             d1.html(stat(t("vs.diag.solved"), f"{diag['solved']}/{diag['points']}", size="md"))
             d2.html(stat(t("vs.diag.max_err"), f"{diag['max_err']:.1e}", size="md"))

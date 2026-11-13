@@ -74,8 +74,8 @@ TEXT: dict[str, Entry] = {
         "plain": "A call is the right to BUY at the agreed price. A put is the right to SELL at the agreed price.",
         "pro": "Call payoff max(S_T - K, 0); put payoff max(K - S_T, 0).",
     },
-    "in.option_type.call": {"plain": "Call · buy", "pro": "Call"},
-    "in.option_type.put": {"plain": "Put · sell", "pro": "Put"},
+    "in.option_type.call": {"plain": "Call (buy)", "pro": "Call"},
+    "in.option_type.put": {"plain": "Put (sell)", "pro": "Put"},
     "in.exercise.label": {"plain": "When can you use it?", "pro": "Exercise style"},
     "in.exercise.help": {
         "plain": "European options can only be used on the expiry date. American options can be used any day until then, which can make them worth a little more.",
@@ -139,7 +139,7 @@ TEXT: dict[str, Entry] = {
 
     # --------------------------------------------------------------- presets
     "presets.title": {"plain": "Try an example", "pro": "Presets"},
-    "presets.load": {"plain": "Load example →", "pro": "Load →"},
+    
     "presets.subtitle": {
         "plain": "Not sure where to start? Pick a real-world situation.",
         "pro": "Load a representative contract.",
@@ -163,11 +163,26 @@ TEXT: dict[str, Entry] = {
         "pro": "Black-Scholes / Garman-Kohlhagen, Cox-Ross-Rubinstein trees, Monte Carlo with variance reduction and a Crank-Nicolson PDE solver, plus Greeks, implied volatility and a full convergence study.",
     },
     "home.quick.title": {"plain": "Quick price", "pro": "Quick price"},
-    "home.quick.open": "Open full pricer",
+    "home.quick.open": "Open the full pricer",
     "home.sections": {"plain": "Explore", "pro": "Sections"},
-    "home.stat.methods": {"plain": "ways to price an option", "pro": "pricing methods"},
-    "home.stat.tests": {"plain": "automated checks", "pro": "unit tests in CI"},
-    "home.stat.libs": {"plain": "pricing libraries used", "pro": "external pricing libraries"},
+    "home.proof": {
+        "plain": "Every answer is checked four ways, and {n} automated tests make sure the maths stays right.",
+        "pro": "Four independent methods, validated against theory, with {n} unit tests running in CI on every push.",
+    },
+    "pricer.ledger.method": "Method",
+    "pricer.ledger.price": "Price",
+    "pricer.ledger.diff": {"plain": "Difference", "pro": "Δ vs reference"},
+    "pricer.ledger.agree": {"plain": "Matching digits", "pro": "Decimals agreed"},
+    "pricer.ledger.detail": {"plain": "Notes", "pro": "Detail"},
+    "pricer.ledger.reference": {"plain": "exact answer", "pro": "reference"},
+    "pricer.ledger.key": {
+        "plain": "Faded digits are where a method starts to differ from the exact formula.",
+        "pro": "Digits are aligned on the decimal point; faded digits are where a method departs from the reference.",
+    },
+    "pricer.facts.intrinsic": {"plain": "Worth if used right now", "pro": "Intrinsic value"},
+    "pricer.facts.time_value": {"plain": "Extra for the time left", "pro": "Time value"},
+    "pricer.facts.expires": {"plain": "Expires in", "pro": "Days to expiry"},
+    "pricer.facts.forward": {"plain": "Expected price at expiry", "pro": "Forward F"},
     "card.pricer": {
         "plain": "Get a price and see four methods agree.",
         "pro": "All four methods side by side, analytical vs numerical Greeks.",
@@ -196,22 +211,22 @@ TEXT: dict[str, Entry] = {
     # --------------------------------------------------------------- pricer
     "pricer.title": {"plain": "Price an option", "pro": "Pricer"},
     "pricer.lede": {
-        "plain": "Describe the option on the left. Its value, and what drives it, appear on the right.",
+        "plain": "Describe the option. Its value, and what drives it, update as you change the inputs.",
         "pro": "One contract, four independent methods, analytical vs numerical Greeks.",
     },
     "pricer.hero.label": {"plain": "What this option is worth today", "pro": "{model} price"},
     "pricer.hero.label_american": {"plain": "What this option is worth today", "pro": "American price (binomial tree)"},
     "pricer.hero.explain_stock": {
         "plain": "This option costs {price}, about {pct:.1f}% of the share price. {moneyness}",
-        "pro": "d₁ = {d1:.4f} · d₂ = {d2:.4f} · forward F = {forward} · {pct:.2f}% of spot",
+        "pro": "d₁ = {d1:.4f}, d₂ = {d2:.4f}, forward F = {forward}, {pct:.2f}% of spot.",
     },
     "pricer.hero.explain_fx": {
         "plain": "This option costs {price} {quote} per 1 {base} ({pct:.2f}% of spot), so about {notional} on a {base} 1 million deal. {moneyness}",
-        "pro": "{pips} {quote} pips · {notional} per {base} 1m notional · d₁ = {d1:.4f} · forward F = {forward}",
+        "pro": "{pips} {quote} pips, or {notional} per {base} 1m notional. d₁ = {d1:.4f}, forward F = {forward}.",
     },
     "pricer.hero.explain_american": {
         "plain": "This option costs {price}. Being able to use it early adds {premium} compared with an only-at-expiry option.",
-        "pro": "Early-exercise premium over European: {premium} · PDE: {pde}",
+        "pro": "Early-exercise premium over the European value: {premium}. PDE value: {pde}.",
     },
     "moneyness.itm": "If it expired today it would be worth {intrinsic}; the rest is time value.",
     "moneyness.atm": "The agreed price is close to today's price, so all of its value is time value.",
@@ -230,7 +245,7 @@ TEXT: dict[str, Entry] = {
     "pips": "{x} pips",
     "pricer.unavailable": {"plain": "Only for options used at expiry", "pro": "European only"},
     "pricer.runtime": "{ms:.1f} ms",
-    "pricer.ci": {"plain": "Likely range {lo} to {hi}", "pro": "95% CI [{lo}, {hi}] · SE {se}"},
+    "pricer.ci": {"plain": "Likely range {lo} to {hi}", "pro": "95% CI [{lo}, {hi}], SE {se}"},
     "pricer.greeks.title": {"plain": "What moves the price", "pro": "Greeks: analytical vs numerical"},
     "pricer.greeks.lede": {
         "plain": "These numbers, called the Greeks, tell you how the option's value reacts when something changes.",
@@ -266,15 +281,15 @@ TEXT: dict[str, Entry] = {
     },
     "method.binomial.desc": {
         "plain": "Steps back through a tree of up and down moves.",
-        "pro": "{steps:,} steps · O(1/N)",
+        "pro": "{steps:,} steps, error O(1/N)",
     },
     "method.monte_carlo.desc": {
         "plain": "Averages the payoff over {paths:,} simulated futures.",
-        "pro": "{paths:,} paths · {vr}",
+        "pro": "{paths:,} paths, {vr}",
     },
     "method.finite_difference.desc": {
         "plain": "Solves the pricing equation on a fine grid.",
-        "pro": "{grid}×{grid} grid · Rannacher start",
+        "pro": "{grid} × {grid} grid, Rannacher start",
     },
     "mc.vr.both": "antithetic + control variate",
     "mc.vr.anti": "antithetic",
@@ -486,10 +501,10 @@ TEXT: dict[str, Entry] = {
     "val.col.status": "Check",
     "val.pass": "✓ Pass",
     "val.running": "Running convergence studies…",
-    "val.summary.order_suffix": " · order of convergence",
+    "val.summary.order_suffix": ", order of convergence",
     "val.summary.sub": {
-        "plain": "{check} · final error {final}",
-        "pro": "expected {expected} · final {what} {final}",
+        "plain": "{check}, final error {final}",
+        "pro": "expected {expected}, final {what} {final}",
     },
     "val.summary.explain": (
         "The big numbers measure how fast each method closes in on the exact answer. 1 means doubling the "

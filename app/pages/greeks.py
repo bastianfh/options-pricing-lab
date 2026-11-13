@@ -10,14 +10,14 @@ import streamlit as st
 
 from app.content import t
 from app.theme import DASHES, colorscale, palette, show, style_figure
-from app.ui import card, explain, input_panel, is_pro, page_header, section, tx
+from app.ui import explain, input_panel, is_pro, page_header, panel, panel_title, section, tx
 from pricing.greeks import GREEK_NAMES, black_scholes_greeks
 
 page_header("gx.title", "gx.lede")
 
 left, right = st.columns([1, 2.3], gap="large")
-with left, card("gx_inputs"):
-    st.html(f'<div class="opl-card-title">{html.escape(tx("inputs.contract"))}</div>')
+with left, panel("gx_inputs"):
+    panel_title(tx("inputs.contract"))
     spec, _, ctx = input_panel(exercise=False, numerics=False)
 
 SCALE = {"vega": 0.01, "theta": 1 / 365, "rho": 0.01}  # market units: per vol pt, per day, per 1%
@@ -45,7 +45,7 @@ with right:
     unit = t(f"greek.{name}.unit")
     p = palette()
     if is_pro():
-        st.caption(f"{label} · {unit}")
+        st.caption(f"{label}, {unit}")
     insight = tx(f"gx.insight.{name}")
     if is_pro():
         st.html(f'<p class="opl-note">{html.escape(insight)}</p>')

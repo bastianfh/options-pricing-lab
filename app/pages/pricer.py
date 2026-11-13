@@ -14,13 +14,14 @@ from app.content import t
 from app.theme import palette, show, style_figure
 from app.ui import (
     Context,
+    agreement_html,
     cached,
-    card,
-    chip,
     explain,
     input_panel,
     is_pro,
     page_header,
+    panel,
+    panel_title,
     preset_pills,
     section,
     signed,
@@ -38,8 +39,8 @@ if not is_pro():
     preset_pills()
 
 left, right = st.columns([1, 2.3], gap="large")
-with left, card("pricer_inputs"):
-    st.html(f'<div class="opl-card-title">{html.escape(tx("inputs.contract"))}</div>')
+with left, panel("pricer_inputs"):
+    panel_title(tx("inputs.contract"))
     spec, settings, ctx = input_panel()
 
 
@@ -84,100 +85,86 @@ with right:
         headline = results[Method.BINOMIAL].price  # American call, no dividends: same as European
     pct = 100 * headline / spec.S
 
-    with card("pricer_hero"):
-        h1, h2 = st.columns([1.35, 1], gap="medium")
-        with h1:
-            if american:
-                label = tx("pricer.hero.label_american")
-            else:
-                label = tx("pricer.hero.label", model=t(model_key, "Pro"))
-            st.html(stat(label, ctx.money(headline, ctx.price_decimals + (2 if is_pro() else 0)), size="xl"))
+    if american:
+        label = tx("pricer.hero.label_american")
+    else:
+        label = tx("pricer.hero.label", model=t(model_key, "Pro"))
+    phi = 1 if spec.option_type is OptionType.CALL else -1
+    intrinsic = max(phi * (spec.S - spec.K), 0.0)
+    fwd = spec.S * math.exp((spec.r - spec.q) * spec.T)
+    facts = [
+        (tx("pricer.facts.intrinsic"), ctx.money(intrinsic)),
+        (tx("pricer.facts.time_value"), ctx.money(headline - intrinsic)),
+        (tx("pricer.facts.forward"), f"{fwd:,.{5 if ctx.is_fx else 2}f}"),
+        (tx("pricer.facts.expires"), f"{st.session_state['in_days']} days"),
+    ]
+    st.html(
+        stat(label, ctx.money(headline, ctx.price_decimals + (2 if is_pro() else 0)), size="xl")
+        + '<div class="opl-factrow">'
+        + "".join(f"<div><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>" for k, v in facts)
+        + "</div>"
+    )
 
-            euro = float(black_scholes_price(spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type))
-            if american:
-                text = tx("pricer.hero.explain_american", price=ctx.money(headline),
-                          premium=ctx.money(headline - euro), pde=ctx.money(results[Method.FINITE_DIFFERENCE].price))
-            else:
-                d1, d2 = (float(x) for x in d1_d2(spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q))
-                forward = spec.S * math.exp((spec.r - spec.q) * spec.T)
-                key = "pricer.hero.explain_fx" if ctx.is_fx else "pricer.hero.explain_stock"
-                text = tx(
-                    key, price=ctx.money(headline), pct=pct, moneyness=moneyness_text(spec, ctx),
-                    d1=d1, d2=d2, forward=ctx.money(forward, 4) if not ctx.is_fx else f"{forward:.5f}",
-                    base=ctx.base, quote=ctx.quote, notional=ctx.notional_million(headline),
-                    pips=f"{headline / ctx.pip:,.1f}",
-                )
-            if is_pro():
-                st.html(f'<p class="opl-note">{html.escape(text)}</p>')
-            else:
-                explain(text)
-        with h2:
-            phi = 1 if spec.option_type is OptionType.CALL else -1
-            intrinsic = max(phi * (spec.S - spec.K), 0.0)
-            if is_pro():
-                fwd = spec.S * math.exp((spec.r - spec.q) * spec.T)
-                pv_intr = max(phi * (spec.S * math.exp(-spec.q * spec.T) - spec.K * math.exp(-spec.r * spec.T)), 0)
-                st.html(
-                    stat("Intrinsic max(φ(S−K), 0)", ctx.money(intrinsic), size="sm")
-                    + "<div style='height:.8rem'></div>"
-                    + stat("Time value", ctx.money(headline - intrinsic), size="sm")
-                    + "<div style='height:.8rem'></div>"
-                    + stat("Forward F", f"{fwd:,.{5 if ctx.is_fx else 2}f}",
-                           sub=f"PV intrinsic on forward {ctx.money(pv_intr)}", size="sm")
-                )
-            else:
-                st.html(
-                    stat("Worth if used right now", ctx.money(intrinsic), size="sm")
-                    + "<div style='height:.8rem'></div>"
-                    + stat("Extra for the time left", ctx.money(headline - intrinsic), size="sm")
-                    + "<div style='height:.8rem'></div>"
-                    + stat("Expires in", f"{st.session_state['in_days']} days", size="sm")
-                )
+    euro = float(black_scholes_price(spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q, spec.option_type))
+    if american:
+        text = tx("pricer.hero.explain_american", price=ctx.money(headline),
+                  premium=ctx.money(headline - euro), pde=ctx.money(results[Method.FINITE_DIFFERENCE].price))
+    else:
+        d1, d2 = (float(x) for x in d1_d2(spec.S, spec.K, spec.T, spec.r, spec.sigma, spec.q))
+        key = "pricer.hero.explain_fx" if ctx.is_fx else "pricer.hero.explain_stock"
+        text = tx(
+            key, price=ctx.money(headline), pct=pct, moneyness=moneyness_text(spec, ctx),
+            d1=d1, d2=d2, forward=ctx.money(fwd, 4) if not ctx.is_fx else f"{fwd:.5f}",
+            base=ctx.base, quote=ctx.quote, notional=ctx.notional_million(headline),
+            pips=f"{headline / ctx.pip:,.1f}",
+        )
+    explain(text)
 
     # ------------------------------------------------------------- methods
     section(tx("pricer.methods.title"))
     reference = headline
-    cols = st.columns(4, gap="small")
-    for col, m in zip(cols, Method):
+    ref_method = Method.BINOMIAL if american else Method.BLACK_SCHOLES
+    decimals = ctx.price_decimals + 2
+    ref_str = ctx.money(reference, decimals)
+    vr = tx("mc.vr." + {(True, True): "both", (True, False): "anti", (False, True): "cv",
+                        (False, False): "none"}[(settings.mc_antithetic, settings.mc_control_variate)])
+    desc_fmt = dict(steps=settings.binomial_steps, paths=settings.mc_paths, grid=settings.pde_space_steps, vr=vr)
+    rows_html = []
+    for m in Method:
         res = results[m]
-        with col, card(f"method_{m.value}"):
-            desc_fmt = dict(
-                steps=settings.binomial_steps, paths=settings.mc_paths, grid=settings.pde_space_steps,
-                vr=tx("mc.vr." + {(True, True): "both", (True, False): "anti", (False, True): "cv",
-                                  (False, False): "none"}[(settings.mc_antithetic, settings.mc_control_variate)]),
-            )
-            desc = tx(f"method.{m.value}.desc", **desc_fmt)
-            if res.available:
-                diff = res.price - reference
-                tone = ""  # a numerical difference is neither good nor bad: keep it neutral
-                diff_val = (t("pips", x=signed(diff / ctx.pip, 2)) if ctx.is_fx
-                            else signed(diff, ctx.price_decimals + 2))
-                diff_txt = tx("pricer.vs_tree" if american else "pricer.vs_reference", diff=diff_val)
-                meta = []
-                if m is Method.MONTE_CARLO:
-                    meta.append(tx("pricer.ci", lo=ctx.money(res.ci_low), hi=ctx.money(res.ci_high),
-                                   se=f"{res.std_error:.{ctx.price_decimals + 2}f}"))
-                if is_pro():
-                    meta.append(tx("pricer.runtime", ms=res.runtime_ms))
-                body = (
-                    f'<div class="opl-method-price">{html.escape(ctx.money(res.price, ctx.price_decimals + (2 if is_pro() else 0)))}</div>'
-                    + (chip(diff_txt, "accent" if m is Method.BLACK_SCHOLES and not american else tone)
-                       if not (m is Method.BLACK_SCHOLES or (american and m is Method.BINOMIAL))
-                       else chip("reference" if is_pro() else "exact answer", "accent"))
-                    + "".join(f'<div class="opl-method-meta">{html.escape(x)}</div>' for x in meta)
-                )
-                cls = "opl-method"
-            else:
-                body = (
-                    '<div class="opl-method-price">–</div>'
-                    + chip(tx("pricer.unavailable"))
-                )
-                cls = "opl-method unavailable"
-            st.html(
-                f'<div class="{cls}"><div class="opl-method-head"><div class="opl-method-name">'
-                f'{html.escape(method_label(m))}</div>'
-                f'<div class="opl-method-desc">{html.escape(desc)}</div></div>{body}</div>'
-            )
+        desc = tx(f"method.{m.value}.desc", **desc_fmt)
+        name_cell = (f'<td><div class="name">{html.escape(method_label(m))}</div>'
+                     f'<div class="desc">{html.escape(desc)}</div></td>')
+        if not res.available:
+            rows_html.append(f'<tr class="na">{name_cell}<td class="num price">–</td>'
+                             f'<td class="num detail" colspan="2">{html.escape(tx("pricer.unavailable"))}</td></tr>')
+            continue
+        price_html, _ = agreement_html(ctx.money(res.price, decimals), ref_str)
+        if m is ref_method:
+            diff_html = f'<span class="opl-tag">{html.escape(tx("pricer.ledger.reference"))}</span>'
+        else:
+            diff = res.price - reference
+            diff_html = html.escape(t("pips", x=signed(diff / ctx.pip, 2)) if ctx.is_fx else signed(diff, decimals))
+        detail = []
+        if m is Method.MONTE_CARLO:
+            detail.append(tx("pricer.ci", lo=ctx.money(res.ci_low), hi=ctx.money(res.ci_high),
+                             se=f"{res.std_error:.{decimals}f}"))
+        if is_pro():
+            detail.append(tx("pricer.runtime", ms=res.runtime_ms))
+        rows_html.append(
+            f'<tr class="{"ref" if m is ref_method else ""}">{name_cell}'
+            f'<td class="num price">{price_html}</td><td class="num">{diff_html}</td>'
+            f'<td class="detail">{"<br>".join(html.escape(d) for d in detail)}</td></tr>'
+        )
+    st.html(
+        '<table class="opl-ledger"><thead><tr>'
+        f'<th>{html.escape(t("pricer.ledger.method"))}</th>'
+        f'<th class="num">{html.escape(t("pricer.ledger.price"))}</th>'
+        f'<th class="num">{html.escape(tx("pricer.ledger.diff"))}</th>'
+        f'<th class="detail">{html.escape(tx("pricer.ledger.detail"))}</th>'
+        f'</tr></thead><tbody>{"".join(rows_html)}</tbody></table>'
+        f'<p class="opl-note">{html.escape(tx("pricer.ledger.key"))}</p>'
+    )
 
     available = [r.price for r in results.values() if r.available]
     spread = max(abs(p - reference) for p in available)
@@ -188,10 +175,7 @@ with right:
         msg = tx("pricer.methods.agree", spread=ctx.money(spread, ctx.price_decimals + 2),
                  model=t(model_key, "Pro"),
                  ci=f"[{ctx.money(mc.ci_low, ctx.price_decimals + 2)}, {ctx.money(mc.ci_high, ctx.price_decimals + 2)}]")
-    if is_pro():
-        st.html(f'<p class="opl-note">{html.escape(msg)}</p>')
-    else:
-        explain(msg)
+    explain(msg)
 
     # -------------------------------------------------------------- greeks
     section(tx("pricer.greeks.title"), tx("pricer.greeks.lede"))
@@ -241,8 +225,7 @@ with right:
                 f'<div class="opl-greek-value">{html.escape(big)}</div>'
                 f'<div class="opl-greek-explain">{html.escape(explain_txt)}</div></div>'
             )
-        with card("greeks_plain"):
-            st.html(f'<div class="opl-greek-list">{"".join(rows_html)}</div>')
+        st.html(f'<div class="opl-greek-list">{"".join(rows_html)}</div>')
 
     # --------------------------------------------------------------- chart
     section(tx("pricer.chart.title"))

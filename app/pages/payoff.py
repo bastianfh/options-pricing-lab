@@ -12,7 +12,7 @@ import streamlit as st
 
 from app.content import t
 from app.theme import palette, show, style_figure
-from app.ui import card, explain, input_panel, is_pro, page_header, preset_pills, section, stat, tx
+from app.ui import explain, input_panel, is_pro, page_header, panel, panel_title, preset_pills, section, stat, tx
 from pricing.greeks import GREEK_NAMES
 from pricing.strategies import PRESETS, Leg, Strategy, from_legs, risk_summary
 
@@ -24,8 +24,8 @@ STRATEGIES = list(PRESETS) + ["custom"]
 NEEDS_WIDTH = {"strangle", "bull_call_spread", "bear_put_spread"}
 
 left, right = st.columns([1, 2.3], gap="large")
-with left, card("pay_inputs"):
-    st.html(f'<div class="opl-card-title">{html.escape(tx("pay.strategy"))}</div>')
+with left, panel("pay_inputs"):
+    panel_title(tx("pay.strategy"))
     st.session_state.setdefault("pay_strategy", "straddle")
     strategy_key = st.selectbox(
         tx("pay.strategy"), STRATEGIES, format_func=lambda k: tx(f"strategy.{k}"), key="pay_strategy",
@@ -43,8 +43,8 @@ with left, card("pay_inputs"):
         if strategy_key in NEEDS_WIDTH:
             st.number_input(tx("pay.width"), min_value=step, step=step, format=fmt, key="pay_width",
                             help=tx("pay.width.help"), persist_state="session")
-    st.html('<div class="opl-sidebar-rule" style="margin:0.6rem 0 0.9rem 0"></div>')
-    st.html(f'<div class="opl-card-title">{html.escape(tx("inputs.market"))}</div>')
+    st.html('<div style="height:0.8rem"></div>')
+    panel_title(tx("inputs.market"))
     spec, _, ctx = input_panel(contract=False, numerics=False, strike=False)
     days_total = int(st.session_state["in_days"])
     st.session_state.setdefault("pay_horizon", days_total // 2)
@@ -107,7 +107,7 @@ p = palette()
 
 with right:
     # ---------------------------------------------------- headline numbers
-    with card("pay_metrics"):
+    with st.container(key="pay_metrics"):
         c1, c2, c3, c4 = st.columns([0.9, 1, 1, 1.35])
         cost_label = tx("pay.cost.debit") if cost >= 0 else tx("pay.cost.credit")
         c1.html(stat(cost_label, ctx.money(abs(cost)), size="md"))
@@ -122,7 +122,7 @@ with right:
         if is_pro():
             g = strategy.greeks(spec.S, T, r, sigma, q)
             st.html(f'<p class="opl-note">{html.escape(tx("strategy." + strategy_key))}: '
-                    + " · ".join(f"{t(f'greek.{n}.short')} {v:+.4f}" for n, v in
+                    + ", ".join(f"{t(f'greek.{n}.short')} {v:+.4f}" for n, v in
                                  zip(GREEK_NAMES, (g.delta, g.gamma, g.vega / 100, g.theta / 365, g.rho / 100)))
                     + "</p>")
         else:
