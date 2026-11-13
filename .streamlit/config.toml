@@ -10,50 +10,53 @@ runOnSave = false
 gatherUsageStats = false
 
 # ---------------------------------------------------------------------------
-# Theme. Shared settings live in [theme]; colours are set per mode so that both
-# light and dark are designed rather than one being an automatic inversion.
-# The same tokens are mirrored in app/theme.py for Plotly charts and CSS.
+# Theme. Shared settings live in [theme]; colours are set per mode. The same
+# tokens are mirrored in app/theme.py for Plotly charts and CSS.
 # ---------------------------------------------------------------------------
 [theme]
-font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+# One family, Archivo, with its width axis as the expressive variable:
+# headings are set semi-expanded, body text at normal width.
+font = "Archivo:https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
+headingFont = "Archivo:https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
+codeFont = "monospace"
 baseFontSize = 15
-baseRadius = "10px"
-buttonRadius = "8px"
-headingFontWeights = [700, 650, 600, 600, 600, 600]
-headingFontSizes = ["2.4rem", "1.6rem", "1.2rem", "1.05rem", "1rem", "0.9rem"]
+baseRadius = "6px"
+buttonRadius = "6px"
+headingFontWeights = [640, 620, 600, 600, 600, 600]
+headingFontSizes = ["2.3rem", "1.5rem", "1.15rem", "1.05rem", "1rem", "0.9rem"]
 showWidgetBorder = true
-showSidebarBorder = true
+showSidebarBorder = false
 
+# Light: cool paper, slate ink, petrol accent. Green/red only for gains/losses.
 [theme.light]
-primaryColor = "#4f46e5"
-backgroundColor = "#f7f8fa"
-secondaryBackgroundColor = "#eef0f4"
-textColor = "#111827"
-borderColor = "#e2e5eb"
-linkColor = "#4f46e5"
-greenColor = "#15803d"
-redColor = "#dc2626"
+primaryColor = "#0d5c61"
+backgroundColor = "#f5f7f6"
+secondaryBackgroundColor = "#e9eeec"
+textColor = "#16212a"
+borderColor = "#d5ddda"
+linkColor = "#0d5c61"
+greenColor = "#1f7a4d"
+redColor = "#b42318"
 blueColor = "#2a78d6"
-dataframeHeaderBackgroundColor = "#f1f3f6"
+dataframeHeaderBackgroundColor = "#edf1ef"
 
 [theme.light.sidebar]
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f3f4f7"
+backgroundColor = "#e9eeec"
+secondaryBackgroundColor = "#dfe6e3"
 
+# Dark: deep petrol-slate rather than neutral black.
 [theme.dark]
-primaryColor = "#8b8cf8"
-backgroundColor = "#0c0e13"
-secondaryBackgroundColor = "#1a1d25"
-textColor = "#e6e8ee"
-borderColor = "#262a34"
-linkColor = "#a5a6fb"
-greenColor = "#34c46b"
-redColor = "#f06565"
+primaryColor = "#5fb4ae"
+backgroundColor = "#0e1517"
+secondaryBackgroundColor = "#182225"
+textColor = "#e1e7e5"
+borderColor = "#26343a"
+linkColor = "#7cc6c0"
+greenColor = "#45b880"
+redColor = "#ef7468"
 blueColor = "#3987e5"
-dataframeHeaderBackgroundColor = "#161922"
+dataframeHeaderBackgroundColor = "#141d20"
 
 [theme.dark.sidebar]
-backgroundColor = "#101218"
-secondaryBackgroundColor = "#1a1d25"
+backgroundColor = "#121b1d"
+secondaryBackgroundColor = "#1c2629"

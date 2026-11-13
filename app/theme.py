@@ -5,11 +5,12 @@ hover labels, margins and series colours are defined once here.
 
 Colour roles
 ------------
-* ``accent``     the single brand accent (indigo); used for the primary series
+* ``accent``     the single brand accent (petrol); used for the primary series
 * ``series``     fixed categorical order for multi-series charts
                  (validated for colour-vision deficiency in both modes)
 * ``gain/loss``  green/red reserved for profit and loss
-* ``ramp``       single-hue sequential/ordinal ramp (light -> dark)
+* ``ramp``       single-hue ordinal ramp for multi-expiry lines
+* ``surface_scale`` single-hue petrol scale for heatmaps and the vol surface
 
 Light and dark values are separate selections, mirroring
 ``.streamlit/config.toml``. Background and font colours are left to
@@ -24,7 +25,7 @@ from typing import Optional
 import plotly.graph_objects as go
 import streamlit as st
 
-FONT_FAMILY = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+FONT_FAMILY = "Archivo, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 
 
 @dataclass(frozen=True)
@@ -44,48 +45,51 @@ class Palette:
     reference: str
     card: str
     card_shadow: str
+    rule: str
     series: tuple[str, ...]
     ramp: tuple[str, ...]
     surface_scale: tuple[str, ...]
 
 
 LIGHT = Palette(
-    accent="#4f46e5",
-    accent_soft="rgba(79, 70, 229, 0.10)",
-    ink="#111827",
-    muted="#6b7280",
-    grid="rgba(17, 24, 39, 0.07)",
-    axis="rgba(17, 24, 39, 0.22)",
-    gain="#15803d",
-    loss="#dc2626",
-    gain_fill="rgba(21, 128, 61, 0.12)",
-    loss_fill="rgba(220, 38, 38, 0.10)",
-    reference="#111827",
-    card="#ffffff",
-    card_shadow="0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 16px rgba(17, 24, 39, 0.04)",
+    accent="#0d5c61",
+    accent_soft="rgba(13, 92, 97, 0.08)",
+    ink="#16212a",
+    muted="#5a6670",
+    grid="rgba(22, 33, 42, 0.07)",
+    axis="rgba(22, 33, 42, 0.24)",
+    gain="#1f7a4d",
+    loss="#b42318",
+    gain_fill="rgba(31, 122, 77, 0.11)",
+    loss_fill="rgba(180, 35, 24, 0.09)",
+    reference="#16212a",
+    card="#e9eeec",
+    card_shadow="none",
+    rule="rgba(22, 33, 42, 0.12)",
     # blue, orange, aqua, yellow: validated categorical order (adjacent CVD dE >= 9)
     series=("#2a78d6", "#eb6834", "#1baf7a", "#eda100"),
-    ramp=("#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"),
-    surface_scale=("#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"),
+    ramp=("#7dbab4", "#4c9e98", "#24827d", "#126866", "#08474a"),
+    surface_scale=("#d9ecea", "#9fd0cb", "#4fa39d", "#16706f", "#0a3f42"),
 )
 
 DARK = Palette(
-    accent="#8b8cf8",
-    accent_soft="rgba(139, 140, 248, 0.14)",
-    ink="#e6e8ee",
-    muted="#9aa1ad",
-    grid="rgba(230, 232, 238, 0.07)",
-    axis="rgba(230, 232, 238, 0.22)",
-    gain="#34c46b",
-    loss="#f06565",
-    gain_fill="rgba(52, 196, 107, 0.14)",
-    loss_fill="rgba(240, 101, 101, 0.13)",
-    reference="#e6e8ee",
-    card="#12151c",
-    card_shadow="0 1px 2px rgba(0, 0, 0, 0.3)",
+    accent="#5fb4ae",
+    accent_soft="rgba(95, 180, 174, 0.12)",
+    ink="#e1e7e5",
+    muted="#95a3a8",
+    grid="rgba(225, 231, 229, 0.07)",
+    axis="rgba(225, 231, 229, 0.24)",
+    gain="#45b880",
+    loss="#ef7468",
+    gain_fill="rgba(69, 184, 128, 0.13)",
+    loss_fill="rgba(239, 116, 104, 0.12)",
+    reference="#e1e7e5",
+    card="#182225",
+    card_shadow="none",
+    rule="rgba(225, 231, 229, 0.12)",
     series=("#3987e5", "#d95926", "#199e70", "#c98500"),
-    ramp=("#184f95", "#256abf", "#3987e5", "#6da7ec", "#9ec5f4"),
-    surface_scale=("#0d366b", "#1c5cab", "#3987e5", "#86b6ef", "#cde2fb"),
+    ramp=("#1e6b68", "#2f8a85", "#4fa8a2", "#7cc6c0", "#aee0db"),
+    surface_scale=("#0a3f42", "#16706f", "#4fa39d", "#9fd0cb", "#d9ecea"),
 )
 
 # Line dashes and markers give every series a second, non-colour encoding.

@@ -52,7 +52,7 @@ def inject_css() -> None:
         f"--opl-accent:{p.accent};--opl-accent-soft:{p.accent_soft};"
         f"--opl-gain:{p.gain};--opl-loss:{p.loss};"
         f"--opl-gain-soft:{p.gain_fill};--opl-loss-soft:{p.loss_fill};"
-        f"--opl-card:{p.card};--opl-card-shadow:{p.card_shadow};"
+        f"--opl-panel:{p.card};--opl-muted:{p.muted};--opl-rule:{p.rule};"
         "}"
     )
     st.html(f"<style>{variables}{css}</style>")
@@ -78,16 +78,15 @@ def render_sidebar(pages: dict[str, st.Page]) -> None:
         st.html(
             '<div class="opl-sidebar-footer">'
             f"<p>{html.escape(t('sidebar.footer'))}</p>"
-            f'<p><a href="{REPO_URL}" target="_blank">{html.escape(t("sidebar.source"))} ↗</a></p>'
+            f'<p><a href="{REPO_URL}" target="_blank" rel="noopener">{html.escape(t("sidebar.source"))}</a></p>'
             "</div>"
         )
 
 
-def page_header(title_key: str, lede_key: str, eyebrow: Optional[str] = None) -> None:
-    """Page title block: small eyebrow, large title, one-line lede."""
-    eyebrow_html = f'<div class="opl-eyebrow">{html.escape(eyebrow)}</div>' if eyebrow else ""
+def page_header(title_key: str, lede_key: str) -> None:
+    """Page title block: large title and a one-line lede."""
     st.html(
-        f'<div class="opl-header">{eyebrow_html}'
+        '<div class="opl-header">'
         f"<h1>{html.escape(tx(title_key))}</h1>"
         f'<p class="opl-lede">{html.escape(tx(lede_key))}</p></div>'
     )
@@ -114,14 +113,33 @@ def stat(label: str, value: str, sub: str = "", tone: str = "", size: str = "md"
     )
 
 
-def chip(text: str, tone: str = "") -> str:
-    """Small pill. ``tone`` in {"", "gain", "loss", "accent"}."""
-    return f'<span class="opl-chip {tone}">{html.escape(text)}</span>'
-
-
 def card(key: str) -> st.delta_generator.DeltaGenerator:
-    """A raised, bordered card container (styled via the ``card_`` key prefix in style.css)."""
+    """An outlined group for a single result (styled via the ``card_`` key prefix in style.css). Use sparingly."""
     return st.container(border=True, key=f"card_{key}")
+
+
+def panel(key: str) -> st.delta_generator.DeltaGenerator:
+    """A tinted surface for a group of inputs (styled via the ``panel_`` key prefix in style.css)."""
+    return st.container(key=f"panel_{key}")
+
+
+def panel_title(text: str) -> None:
+    st.html(f'<div class="opl-panel-title">{html.escape(text)}</div>')
+
+
+def agreement_html(value: str, reference: str) -> tuple[str, int]:
+    """Split ``value`` into the characters that match ``reference`` and the rest.
+
+    Returns HTML with the diverging tail wrapped in ``.diverge`` (shown faded), and
+    the number of decimal places on which the two agree. Both strings must be
+    formatted with the same number of decimals.
+    """
+    n = 0
+    while n < min(len(value), len(reference)) and value[n] == reference[n]:
+        n += 1
+    decimals_agreed = max(0, n - (reference.find(".") + 1)) if "." in reference else 0
+    head, tail = html.escape(value[:n]), html.escape(value[n:])
+    return (head + (f'<span class="diverge">{tail}</span>' if tail else "")), decimals_agreed
 
 
 # ---------------------------------------------------------------------------
@@ -432,23 +450,17 @@ def _load_preset(name: str) -> None:
     st.session_state["_goto"] = preset["page"]
 
 
-def preset_buttons(columns: int = 4) -> None:
-    """Row of example scenarios; clicking one loads it and opens the relevant page."""
-    cols = st.columns(columns)
-    for i, name in enumerate(PRESETS):
-        with cols[i % columns]:
-            with card(f"preset_{name}"):
-                st.html(
-                    f'<div class="opl-preset"><div class="opl-preset-title">{html.escape(tx(f"preset.{name}.title"))}</div>'
-                    f'<div class="opl-preset-desc">{html.escape(tx(f"preset.{name}.desc"))}</div></div>'
-                )
-                st.button(
-                    tx("presets.load"),
-                    key=f"preset_{name}",
-                    on_click=_load_preset,
-                    args=(name,),
-                    type="tertiary",
-                )
+def preset_buttons() -> None:
+    """Example scenarios as a row of buttons; clicking one loads it and opens the relevant page."""
+    with st.container(horizontal=True, gap="small"):
+        for name in PRESETS:
+            st.button(
+                tx(f"preset.{name}.title"),
+                key=f"preset_{name}",
+                on_click=_load_preset,
+                args=(name,),
+                help=tx(f"preset.{name}.desc"),
+            )
 
 
 def _on_preset_pill() -> None:
