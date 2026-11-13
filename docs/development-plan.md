@@ -86,3 +86,22 @@ The first version used the default "AI SaaS" look: Tailwind indigo, Inter, ident
 | Signature element | The method ledger: prices aligned on the decimal point, with digits that diverge from the reference faded, so agreement is visible at a glance. |
 | Removed | Card grids, eyebrow labels, the stat strip, callout boxes, arrows on links, and "·"-joined meta strings. |
 | Fixed | Page title clipped under the top bar on phones; copy that said "on the left" when inputs sit above on a phone. |
+
+## Visual redesign v2: quant desk x industrial hardware (supersedes the petrol design above)
+
+A second overhaul to a bespoke terminal look: the data density of a derivatives desk with the Swiss-grid hardware minimalism of a synth panel. Only layout, styling and chart aesthetics changed; `pricing/` and `tests/` are untouched.
+
+| Choice | Detail |
+|---|---|
+| Palette | Locked matte dark: carbon `#0A0A0B` canvas, graphite `#111113` modules, `#161619` input wells, `#222226` hairlines. Text `#F4F4F6` / `#8E8E93` / `#48484D`. Signal orange `#FF5500` for the active parameter, emerald `#00E676` for call/long/profit, crimson `#FF3B30` for put/short/loss, amber `#FFB800` for volatility. |
+| Type | JetBrains Mono for every number, input, table and axis (tabular figures everywhere); Inter for short prose. Labels are uppercase hardware micro-labels with bracketed symbols (`SPOT [S]`, `VOLATILITY [σ]`), upper-cased in Python so Greek letters survive. |
+| Geometry | Radii of 0-2px; modules share exposed 1px rules (CSS grid with a 1px gap over the rule colour). No shadows, gradients, glows or hover animations. |
+| Topology | 40px telemetry bar (tool tabs `[01] PRICER` to `[06] METHODS`, live model / r / σ / T readout, status LED, Plain/Pro switch); left control bay; numbered analytical modules (`02 // THEORETICAL VALUE`, `03 // ...`). The app opens straight into the Pricer. |
+| Charts | One helper: transparent paper, graphite plot area, `#1C1C20` grid, mirrored hairline axes, monospace 10px ticks, sharp dark tooltips, dashed grey/orange reference lines, single-hue orange (sensitivities) or amber (volatility) colour scales, crimson/emerald diverging scale only when a value changes sign. |
+
+**Changes to earlier requirements, made deliberately:**
+- Light mode was removed (the brief locks dark).
+- The Plain English / Pro switch moved from the sidebar to the always-visible top bar, because the sidebar was removed.
+- The Home page was removed; its example scenarios live on the Pricer.
+- Plain English explanations were kept as small notes: they are a core feature, not filler.
+- Emerald vs crimson is a red-green pair, so it is always paired with +/− signs, dashes, markers or text labels.

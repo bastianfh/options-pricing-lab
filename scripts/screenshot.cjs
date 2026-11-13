@@ -11,7 +11,7 @@ const { chromium } = require("playwright");
 const { mkdirSync } = require("node:fs");
 const { join } = require("node:path");
 
-const PATHS = { home: "", pricer: "pricer", greeks: "greeks", payoff: "payoff",
+const PATHS = { pricer: "", greeks: "greeks", payoff: "payoff",
   surface: "surface", validation: "validation", methods: "methods" };
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, arr) => {

@@ -21,9 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pricing.convergence import binomial_study, monte_carlo_study, pde_study, standard_error_order  # noqa: E402
 from pricing.engine import OptionSpec  # noqa: E402
 
-FONT = "Inter, -apple-system, 'Segoe UI', sans-serif"
-INK, MUTED, GRID = "#111827", "#6b7280", "rgba(17,24,39,0.08)"
-BLUE, ORANGE, AQUA, YELLOW = "#2a78d6", "#eb6834", "#1baf7a", "#eda100"
+FONT = "'JetBrains Mono', ui-monospace, monospace"
+INK, MUTED, GRID, RULE = "#F4F4F6", "#8E8E93", "#1C1C20", "#222226"
+BLUE, ORANGE, AQUA, YELLOW = "#FF5500", "#8E8E93", "#00E676", "#FFB800"
 
 
 def main(out: str) -> None:
@@ -66,21 +66,26 @@ def main(out: str) -> None:
     fig.add_trace(go.Scatter(x=grids, y=ref(grids, pe[0] * 1.3, 2), name="O(1/M²)", mode="lines",
                              line=dict(color=MUTED, dash="dashdot", width=1.5)), 1, 3)
 
-    axis = dict(type="log", gridcolor=GRID, linecolor="rgba(17,24,39,0.25)", showline=True, ticks="outside",
-                tickcolor="rgba(17,24,39,0.25)", zeroline=False, exponentformat="power", dtick=1, tickfont=dict(size=12))
+    axis = dict(type="log", gridcolor=GRID, linecolor=RULE, mirror=True, showline=True, ticks="outside",
+                tickcolor=RULE, zeroline=False, exponentformat="power", dtick=1, tickfont=dict(size=11, color=MUTED))
     fig.update_xaxes(**axis)
     fig.update_yaxes(**axis)
     fig.update_xaxes(title_text="time steps N", row=1, col=1)
     fig.update_xaxes(title_text="paths n", row=1, col=2)
     fig.update_xaxes(title_text="grid size M = N", row=1, col=3)
     fig.update_yaxes(title_text="absolute error vs Black-Scholes", row=1, col=1)
-    fig.update_annotations(font=dict(size=13, family=FONT, color=INK))
+    fig.update_annotations(font=dict(size=12, family=FONT, color=INK))
     fig.update_layout(
-        width=1500, height=520, font=dict(family=FONT, size=12, color=INK),
-        paper_bgcolor="white", plot_bgcolor="white", margin=dict(l=70, r=30, t=50, b=90),
+        width=1500, height=520, font=dict(family=FONT, size=11, color=MUTED),
+        paper_bgcolor="#0A0A0B", plot_bgcolor="#111113", margin=dict(l=70, r=30, t=50, b=90),
         legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center", font=dict(size=12)),
     )
     fig.write_html(out, include_plotlyjs="inline", full_html=True, config={"displayModeBar": False})
+    # Load the same monospace face the app uses, on the same carbon canvas.
+    page = Path(out).read_text()
+    head = ('<head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500'
+            '&display=swap"><style>body{margin:0;background:#0A0A0B}</style>')
+    Path(out).write_text(page.replace("<head>", head, 1))
     print(out)
 
 

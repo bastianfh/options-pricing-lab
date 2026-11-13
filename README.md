@@ -7,9 +7,9 @@
 
 **An app that prices options four different ways and shows they all land on the same answer. I wrote the pricing maths myself instead of using an existing library.**
 
-👉 **Try it live: [options-pricing-lab-bastianfh.streamlit.app](https://options-pricing-lab-bastianfh.streamlit.app/)** (nothing to install)
+**Try it live: [options-pricing-lab-bastianfh.streamlit.app](https://options-pricing-lab-bastianfh.streamlit.app/)** (nothing to install)
 
-![The Pricer page](docs/images/pricer-pro-light.png)
+![The Pricer page](docs/images/pricer-pro-dark.png)
 
 ## What it does
 
@@ -24,14 +24,16 @@ You set up an option (stock or currency, call or put, strike, expiry, volatility
 - **Implied volatility:** works backwards from a price to the volatility the market is assuming, and plots it as a 3D surface.
 - **Profit and loss** for common strategies like straddles, spreads and covered calls.
 
-There's a **Plain English / Pro** switch at the top of the sidebar. Plain English explains everything in everyday words; Pro shows the proper notation and extra detail. To open the app straight in Pro mode, add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
+There's a **Plain English / Pro** switch in the top bar. Plain English explains everything in everyday words; Pro shows the proper notation and extra detail. To open the app straight in Pro mode, add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
 
 ## The app's pages
 
+The look is a dark trading terminal crossed with hardware-style panels: monospace numbers that line up, thin dividing lines, and one orange accent for whatever you're changing. Green means call / profit, red means put / loss, amber means volatility.
+
+
 | Page | What's on it |
 |---|---|
-| **Home** | Quick price calculator and example scenarios |
-| **Pricer** | All four methods side by side, plus the Greeks |
+| **Pricer** | The starting page: price, all four methods side by side, the Greeks, and example scenarios |
 | **Greeks explorer** | Charts of how each Greek changes with the stock price and time |
 | **Payoff & P&L** | What a strategy makes or loses at expiry and before |
 | **Volatility surface** | 3D implied volatility surface and smile charts |
@@ -40,12 +42,12 @@ There's a **Plain English / Pro** switch at the top of the sidebar. Plain Englis
 
 <table>
 <tr>
-<td><img src="docs/images/validation-pro-light.png" alt="Validation page"><br><sub><b>Validation</b></sub></td>
-<td><img src="docs/images/payoff-plain-light.png" alt="Payoff page"><br><sub><b>Payoff & P&L</b> (Plain English mode)</sub></td>
+<td><img src="docs/images/validation-pro-dark.png" alt="Validation page"><br><sub><b>Validation</b></sub></td>
+<td><img src="docs/images/payoff-plain-dark.png" alt="Payoff page"><br><sub><b>Payoff & P&L</b> (Plain English mode)</sub></td>
 </tr>
 <tr>
-<td><img src="docs/images/surface-pro-dark.png" alt="Volatility surface"><br><sub><b>Volatility surface</b> (dark mode)</sub></td>
-<td><img src="docs/images/greeks-pro-dark.png" alt="Greeks explorer"><br><sub><b>Greeks explorer</b> (dark mode)</sub></td>
+<td><img src="docs/images/surface-pro-dark.png" alt="Volatility surface"><br><sub><b>Volatility surface</b></sub></td>
+<td><img src="docs/images/greeks-pro-dark.png" alt="Greeks explorer"><br><sub><b>Greeks explorer</b></sub></td>
 </tr>
 </table>
 
@@ -57,9 +59,9 @@ Black-Scholes gives an exact answer for simple options, so I can check the other
 
 | Method | What the theory says | What I measured |
 |---|---|---|
-| Binomial tree | double the steps → error halves | ✅ matches |
-| Finite differences | double the grid → error drops 4× | ✅ matches |
-| Monte Carlo | 4× the simulations → error halves | ✅ matches |
+| Binomial tree | double the steps → error halves | Matches |
+| Finite differences | double the grid → error drops 4× | Matches |
+| Monte Carlo | 4× the simulations → error halves | Matches |
 
 The Validation page in the app has the full charts and tables.
 
