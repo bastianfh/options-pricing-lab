@@ -12,9 +12,9 @@ import streamlit as st
 
 from app.content import t
 from app.theme import palette, show, style_figure
-from app.ui import explain, input_panel, is_pro, page_header, panel, panel_title, preset_pills, section, stat, tx
+from app.ui import cells, explain, input_panel, is_pro, lbl, page_header, panel, panel_title, preset_pills, section, tx, upper
 from pricing.greeks import GREEK_NAMES
-from pricing.strategies import PRESETS, Leg, Strategy, from_legs, risk_summary
+from pricing.strategies import PRESETS, Leg, from_legs, risk_summary
 
 page_header("pay.title", "pay.lede")
 if not is_pro():
@@ -28,7 +28,7 @@ with left, panel("pay_inputs"):
     panel_title(tx("pay.strategy"))
     st.session_state.setdefault("pay_strategy", "straddle")
     strategy_key = st.selectbox(
-        tx("pay.strategy"), STRATEGIES, format_func=lambda k: tx(f"strategy.{k}"), key="pay_strategy",
+        lbl("pay.strategy"), STRATEGIES, format_func=lambda k: upper(tx(f"strategy.{k}")), key="pay_strategy",
         label_visibility="collapsed", persist_state="session",
     )
     spot_now = float(st.session_state.get("in_S", 100.0))
@@ -38,10 +38,10 @@ with left, panel("pay_inputs"):
     fmt = "%.4f" if is_fx else "%.2f"
     step = 0.001 if is_fx else 1.0
     if strategy_key != "custom":
-        st.number_input(tx("pay.center"), min_value=1e-4, step=step, format=fmt, key="pay_center",
+        st.number_input(lbl("pay.center"), min_value=1e-4, step=step, format=fmt, key="pay_center",
                         help=tx("pay.center.help"), persist_state="session")
         if strategy_key in NEEDS_WIDTH:
-            st.number_input(tx("pay.width"), min_value=step, step=step, format=fmt, key="pay_width",
+            st.number_input(lbl("pay.width"), min_value=step, step=step, format=fmt, key="pay_width",
                             help=tx("pay.width.help"), persist_state="session")
     st.html('<div style="height:0.8rem"></div>')
     panel_title(tx("inputs.market"))
@@ -50,7 +50,7 @@ with left, panel("pay_inputs"):
     st.session_state.setdefault("pay_horizon", days_total // 2)
     if st.session_state["pay_horizon"] >= days_total:
         st.session_state["pay_horizon"] = max(days_total // 2, 0)
-    horizon = st.slider(tx("pay.horizon"), 0, max(days_total - 1, 1), key="pay_horizon",
+    horizon = st.slider(lbl("pay.horizon"), 0, max(days_total - 1, 1), key="pay_horizon",
                         help=tx("pay.horizon.help"), persist_state="session")
 
 center = float(st.session_state["pay_center"])
@@ -108,16 +108,17 @@ p = palette()
 with right:
     # ---------------------------------------------------- headline numbers
     with st.container(key="pay_metrics"):
-        c1, c2, c3, c4 = st.columns([0.9, 1, 1, 1.35])
         cost_label = tx("pay.cost.debit") if cost >= 0 else tx("pay.cost.credit")
-        c1.html(stat(cost_label, ctx.money(abs(cost)), size="md"))
         mp = tx("pay.unlimited") if summary.max_profit is None else ctx.money(summary.max_profit)
         ml = tx("pay.unlimited") if summary.max_loss is None else ctx.money(summary.max_loss)
-        c2.html(stat(tx("pay.max_profit"), mp, size="md", tone="gain"))
-        c3.html(stat(tx("pay.max_loss"), ml, size="md", tone="loss"))
         be = summary.breakevens
-        be_txt = " – ".join(ctx.spot(b) for b in be[:2]) if be else t("pay.none")
-        c4.html(stat(tx("pay.breakeven"), be_txt, size="md"))
+        be_txt = " / ".join(ctx.spot(b) for b in be[:2]) if be else t("pay.none")
+        st.html(cells([
+            (cost_label, ctx.money(abs(cost)), "", "acc"),
+            (tx("pay.max_profit"), upper(mp), "", "pos"),
+            (tx("pay.max_loss"), upper(ml), "", "neg"),
+            (tx("pay.breakeven"), be_txt, "", ""),
+        ]))
         summary_txt = t(f"strategy.{strategy_key}.summary")
         if is_pro():
             g = strategy.greeks(spec.S, T, r, sigma, q)
@@ -134,7 +135,7 @@ with right:
                              fillcolor=p.gain_fill, line=dict(width=0), hoverinfo="skip", showlegend=False))
     fig.add_trace(go.Scatter(x=grid, y=np.where(pnl_expiry < 0, pnl_expiry, 0), fill="tozeroy",
                              fillcolor=p.loss_fill, line=dict(width=0), hoverinfo="skip", showlegend=False))
-    fig.add_hline(y=0, line=dict(color=p.axis, width=1))
+    fig.add_hline(y=0, line=dict(color=p.muted, width=1, dash="dash"))
     fig.add_trace(go.Scatter(x=grid, y=pnl_expiry, name=tx("pay.chart.expiry"),
                              line=dict(color=p.ink, width=2), hovertemplate="%{y:,.4f}"))
     if 0 < horizon < days_total:
@@ -145,7 +146,7 @@ with right:
                              line=dict(color=p.accent, width=2.5), hovertemplate="%{y:,.4f}"))
     if be:
         fig.add_trace(go.Scatter(x=be, y=[0] * len(be), mode="markers", name=tx("pay.breakeven"),
-                                 marker=dict(color=p.ink, size=9, symbol="diamond", line=dict(color="white", width=1.5)),
+                                 marker=dict(color=p.accent, size=8, symbol="diamond", line=dict(color=p.canvas, width=1.5)),
                                  hovertemplate="%{x:,.4f}"))
     fig.add_vline(x=spec.S, line=dict(color=p.accent, width=1, dash="dot"),
                   annotation_text=tx("pricer.chart.spot"), annotation_position="bottom right", annotation_font_size=11)

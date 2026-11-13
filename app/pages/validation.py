@@ -9,15 +9,13 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from plotly.subplots import make_subplots
 
 from app.content import t
 from app.theme import DASHES, MARKERS, palette, show, style_figure
-from app.ui import cached, count_tests, explain, is_pro, page_header, section, stat, tx
+from app.ui import cached, cells, count_tests, explain, is_pro, lbl, page_header, section, tx, upper
 from pricing.convergence import (
     MC_VARIANTS,
     binomial_study,
-    empirical_order,
     monte_carlo_study,
     pde_study,
     standard_error_order,
@@ -45,13 +43,13 @@ CASE_LABELS = {
 c1, c2 = st.columns([2, 1], gap="large")
 with c1:
     case = st.segmented_control(
-        tx("val.case"), list(CASES), format_func=lambda c: CASE_LABELS[c]["Pro" if is_pro() else "Plain English"],
+        lbl("val.case"), list(CASES), format_func=lambda c: upper(CASE_LABELS[c]["Pro" if is_pro() else "Plain English"]),
         key="val_case", default="atm", required=True, help=t("val.case.help"), persist_state="session",
         width="stretch",
     )
 with c2:
     opt = st.segmented_control(
-        tx("in.option_type.label"), ["call", "put"], format_func=lambda v: tx(f"in.option_type.{v}"),
+        lbl("in.option_type.label"), ["call", "put"], format_func=lambda v: upper(tx(f"in.option_type.{v}")),
         key="val_type", default="call", required=True, persist_state="session", width="stretch",
     )
 spec = OptionSpec(T=1.0, r=0.05, sigma=0.20, q=0.02, option_type=opt, **CASES[case])
@@ -147,14 +145,15 @@ orders = {
                     f"n = {MC_PATHS[0]:,}…{MC_PATHS[-1]:,}"),
 }
 with st.container(key="val_summary"):
-    cols = st.columns(3)
-    for col, (m, (measured, expected, tol, final, res)) in zip(cols, orders.items()):
+    summary_cells = []
+    for m, (measured, expected, tol, final, res) in orders.items():
         ok = abs(measured - expected) < tol
         label = tx(f"method.{m}")
         sub = tx("val.summary.sub", expected=f"{expected:g}", final=f"{final:.1e}",
                  what="SE" if m == "monte_carlo" else "error", check=t("val.pass") if ok else t("val.fail"))
-        col.html(stat(label + t("val.summary.order_suffix") if is_pro() else label, f"{measured:.2f}", sub=sub,
-                      size="lg", tone="" if ok else "loss"))
+        summary_cells.append((label + t("val.summary.order_suffix") if is_pro() else label,
+                              f"{measured:.2f}", upper(sub), "pos" if ok else "neg"))
+    st.html(cells(summary_cells, extra_class="opl-readout-row"))
     if is_pro():
         df = pd.DataFrame([
             {t("val.col.method"): t(f"method.{m}", "Pro"), t("val.col.resolution"): res,
@@ -183,7 +182,7 @@ series = [
 for i, (name, x, y) in enumerate(series):
     fig.add_trace(go.Scatter(x=x, y=y, name=name, mode="lines+markers",
                              line=dict(color=p.series[i], width=2, dash=DASHES[i]),
-                             marker=dict(size=7, symbol=MARKERS[i], line=dict(color="white", width=1)),
+                             marker=dict(size=7, symbol=MARKERS[i], line=dict(color=p.canvas, width=1)),
                              hovertemplate="%{x:.2f} ms → %{y:.2e}<extra>" + name + "</extra>"))
 fig.update_xaxes(type="log", dtick=1)
 fig.update_yaxes(type="log", exponentformat="power", dtick=1)
@@ -196,7 +195,7 @@ b1, b2 = st.columns(2, gap="medium")
 with b1:
     even = bin_zig.resolution % 2 == 0
     fig = go.Figure()
-    fig.add_hline(y=bs, line=dict(color=p.reference, width=1.5, dash="dash"),
+    fig.add_hline(y=bs, line=dict(color=p.accent, width=1, dash="dash"),
                   annotation_text=tx("val.exact"), annotation_position="top right", annotation_font_size=11)
     for i, (mask, label) in enumerate([(even, t("val.bin.even")), (~even, t("val.bin.odd"))]):
         fig.add_trace(go.Scatter(x=bin_zig.resolution[mask], y=bin_zig.prices[mask], name=label, mode="lines",
@@ -211,7 +210,7 @@ with b2:
                              line=dict(color=p.series[0], width=1.5), marker=dict(size=5),
                              hovertemplate="N=%{x}: %{y:.2e}"))
     fig.add_trace(go.Scatter(x=bin_dense.resolution, y=ref_line(bin_dense.resolution, err.max() * 1.2, 1.0),
-                             name=tx("val.ref_slope", p=1), line=dict(color=p.muted, width=1.5, dash="dot"),
+                             name=tx("val.ref_slope", p=1), line=dict(color=p.label, width=1, dash="dot"),
                              hoverinfo="skip"))
     fig.update_xaxes(type="log", dtick=1)
     fig.update_yaxes(type="log", exponentformat="power", dtick=1)
@@ -234,7 +233,7 @@ section(tx("val.mc.title"), tx("val.mc.lede"))
 m1, m2 = st.columns(2, gap="medium")
 with m1:
     fig = go.Figure()
-    fig.add_hline(y=bs, line=dict(color=p.reference, width=1.5, dash="dash"),
+    fig.add_hline(y=bs, line=dict(color=p.accent, width=1, dash="dash"),
                   annotation_text=tx("val.exact"), annotation_position="top right", annotation_font_size=11)
     for i, key in enumerate(["plain", "antithetic_control_variate"]):
         study = mc.studies[key]
@@ -242,7 +241,7 @@ with m1:
         x = study.resolution * (1.0 if i == 0 else 1.08)  # slight offset so the bars don't overlap
         fig.add_trace(go.Scatter(
             x=x, y=study.prices, name=names_mc[key], mode="markers",
-            marker=dict(size=8, color=color, symbol=MARKERS[i], line=dict(color="white", width=1)),
+            marker=dict(size=8, color=color, symbol=MARKERS[i], line=dict(color=p.canvas, width=1)),
             error_y=dict(type="data", array=1.96 * study.std_errors, color=color, thickness=1.5, width=4),
             hovertemplate="n=%{x:,.0f}: %{y:.5f}",
         ))
@@ -256,7 +255,7 @@ with m2:
                                  line=dict(color=p.series[i], width=2, dash=DASHES[i]),
                                  marker=dict(size=6, symbol=MARKERS[i]), hovertemplate="%{y:.2e}"))
     fig.add_trace(go.Scatter(x=MC_PATHS, y=ref_line(MC_PATHS, plain_mc.std_errors[0] * 1.3, 0.5),
-                             name=tx("val.ref_slope", p="1/2"), line=dict(color=p.muted, width=1.5, dash="dot"),
+                             name=tx("val.ref_slope", p="1/2"), line=dict(color=p.label, width=1, dash="dot"),
                              hoverinfo="skip"))
     fig.update_xaxes(type="log", dtick=1)
     fig.update_yaxes(type="log", exponentformat="power", dtick=1)
@@ -290,7 +289,7 @@ with d1:
                              line=dict(color=p.series[2], width=2), marker=dict(size=8, symbol="diamond"),
                              hovertemplate="M=%{x}: %{y:.2e}"))
     fig.add_trace(go.Scatter(x=PDE_GRIDS, y=ref_line(PDE_GRIDS, err[0] * 1.3, 2.0), name=tx("val.ref_slope", p=2),
-                             line=dict(color=p.muted, width=1.5, dash="dot"), hoverinfo="skip"))
+                             line=dict(color=p.label, width=1, dash="dot"), hoverinfo="skip"))
     fig.update_xaxes(type="log", dtick=1)
     fig.update_yaxes(type="log", exponentformat="power", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.pde.x"), y_title=tx("val.error_y"), hovermode="closest")
@@ -320,7 +319,7 @@ with a1:
     fig.add_trace(go.Scatter(x=grids, y=pde_am, name=tx("method.finite_difference"), mode="lines+markers",
                              line=dict(color=p.series[2], width=2, dash="dash"), marker=dict(size=7, symbol=MARKERS[2]),
                              hovertemplate="%{y:.6f}"))
-    fig.add_hline(y=euro_am, line=dict(color=p.muted, width=1.2, dash="dot"),
+    fig.add_hline(y=euro_am, line=dict(color=p.label, width=1, dash="dot"),
                   annotation_text=tx("val.am.european"), annotation_position="bottom right", annotation_font_size=11)
     fig.update_xaxes(type="log", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.am.x"), y_title=tx("val.price_y"), hovermode="closest")
@@ -366,11 +365,11 @@ with q2:
     section(tx("val.iv.title"), tx("val.iv.lede"))
     n_iv, vol_err, price_err, n_bis = iv_round_trip()
     with st.container(key="val_iv"):
-        i1, i2 = st.columns(2)
-        i1.html(stat(t("val.iv.cases"), f"{n_iv}", size="md"))
-        i2.html(stat(t("val.iv.max_vol_err"), f"{vol_err:.1e}", size="md"))
-        i3, i4 = st.columns(2)
-        i3.html(stat(t("val.iv.max_price_err"), f"{price_err:.1e}", size="md"))
-        i4.html(stat(t("val.iv.bisection"), f"{n_bis}", size="md"))
+        st.html(cells([
+            (t("val.iv.cases"), f"{n_iv}", "", ""),
+            (t("val.iv.max_vol_err"), f"{vol_err:.1e}", "", "pos"),
+            (t("val.iv.max_price_err"), f"{price_err:.1e}", "", "pos"),
+            (t("val.iv.bisection"), f"{n_bis}", "", ""),
+        ], columns=2))
 
 st.html(f'<p class="opl-note" style="margin-top:1.6rem">{html.escape(tx("val.tests", n=count_tests()))}</p>')

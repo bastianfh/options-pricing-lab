@@ -25,8 +25,8 @@ from app.ui import (
     preset_pills,
     section,
     signed,
-    stat,
     tx,
+    upper,
 )
 from pricing.engine import Method, NumericalSettings, OptionSpec, greeks, price_all
 from pricing.greeks import GREEK_NAMES
@@ -38,7 +38,7 @@ page_header("pricer.title", "pricer.lede")
 if not is_pro():
     preset_pills()
 
-left, right = st.columns([1, 2.3], gap="large")
+left, right = st.columns([1, 3.1], gap="small")
 with left, panel("pricer_inputs"):
     panel_title(tx("inputs.contract"))
     spec, settings, ctx = input_panel()
@@ -85,6 +85,7 @@ with right:
         headline = results[Method.BINOMIAL].price  # American call, no dividends: same as European
     pct = 100 * headline / spec.S
 
+    section(tx("pricer.readout.title"))
     if american:
         label = tx("pricer.hero.label_american")
     else:
@@ -92,16 +93,22 @@ with right:
     phi = 1 if spec.option_type is OptionType.CALL else -1
     intrinsic = max(phi * (spec.S - spec.K), 0.0)
     fwd = spec.S * math.exp((spec.r - spec.q) * spec.T)
-    facts = [
+    is_call = spec.option_type is OptionType.CALL
+    badge = (f'<span class="opl-badge {"pos" if is_call else "neg"}">{"CALL" if is_call else "PUT"}</span>'
+             f'<span class="opl-badge acc">{"AMERICAN" if american else "EUROPEAN"}</span>')
+    side_cells = [
         (tx("pricer.facts.intrinsic"), ctx.money(intrinsic)),
         (tx("pricer.facts.time_value"), ctx.money(headline - intrinsic)),
         (tx("pricer.facts.forward"), f"{fwd:,.{5 if ctx.is_fx else 2}f}"),
-        (tx("pricer.facts.expires"), f"{st.session_state['in_days']} days"),
+        (tx("pricer.facts.expires"), f"{st.session_state['in_days']} D"),
     ]
     st.html(
-        stat(label, ctx.money(headline, ctx.price_decimals + (2 if is_pro() else 0)), size="xl")
-        + '<div class="opl-factrow">'
-        + "".join(f"<div><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>" for k, v in facts)
+        '<div class="opl-grid" style="grid-template-columns:2.2fr repeat(4, minmax(0, 1fr))">'
+        f'<div class="opl-cell opl-readout"><div class="k">{html.escape(upper(label))}{badge}</div>'
+        f'<div class="v">{html.escape(ctx.money(headline, ctx.price_decimals + (2 if is_pro() else 0)))}</div>'
+        f'<div class="s">{pct:.2f}% OF SPOT</div></div>'
+        + "".join(f'<div class="opl-cell"><div class="k">{html.escape(upper(k))}</div>'
+                  f'<div class="v">{html.escape(v)}</div></div>' for k, v in side_cells)
         + "</div>"
     )
 
@@ -133,7 +140,7 @@ with right:
     for m in Method:
         res = results[m]
         desc = tx(f"method.{m.value}.desc", **desc_fmt)
-        name_cell = (f'<td><div class="name">{html.escape(method_label(m))}</div>'
+        name_cell = (f'<td><div class="name">{html.escape(upper(method_label(m)))}</div>'
                      f'<div class="desc">{html.escape(desc)}</div></td>')
         if not res.available:
             rows_html.append(f'<tr class="na">{name_cell}<td class="num price">–</td>'
@@ -158,10 +165,10 @@ with right:
         )
     st.html(
         '<table class="opl-ledger"><thead><tr>'
-        f'<th>{html.escape(t("pricer.ledger.method"))}</th>'
-        f'<th class="num">{html.escape(t("pricer.ledger.price"))}</th>'
-        f'<th class="num">{html.escape(tx("pricer.ledger.diff"))}</th>'
-        f'<th class="detail">{html.escape(tx("pricer.ledger.detail"))}</th>'
+        f'<th>{html.escape(upper(t("pricer.ledger.method")))}</th>'
+        f'<th class="num">{html.escape(upper(t("pricer.ledger.price")))}</th>'
+        f'<th class="num">{html.escape(upper(tx("pricer.ledger.diff")))}</th>'
+        f'<th class="detail">{html.escape(upper(tx("pricer.ledger.detail")))}</th>'
         f'</tr></thead><tbody>{"".join(rows_html)}</tbody></table>'
         f'<p class="opl-note">{html.escape(tx("pricer.ledger.key"))}</p>'
     )
@@ -180,6 +187,46 @@ with right:
     # -------------------------------------------------------------- greeks
     section(tx("pricer.greeks.title"), tx("pricer.greeks.lede"))
     primary = gks[Method.BLACK_SCHOLES] or gks[Method.BINOMIAL]
+    symbols = {"delta": "Δ", "gamma": "Γ", "vega": "ν", "theta": "Θ", "rho": "ρ"}
+    # Display-only scales for the micro-bars: |Δ| is in [0, 1]; Γ and ν are shown relative to
+    # their at-the-money maximum. Θ and ρ get a sign indicator only.
+    sq_t = math.sqrt(max(spec.T, 1e-9))
+    disc_q = math.exp(-spec.q * spec.T)
+    gamma_atm = disc_q * 0.3989422804 / (spec.S * spec.sigma * sq_t)
+    vega_atm = spec.S * disc_q * 0.3989422804 * sq_t / 100
+    one = "$1" if not ctx.is_fx else "0.01"
+    strip = []
+    for name in GREEK_NAMES:
+        v = greek_display(name, getattr(primary, name))
+        if name == "delta":
+            value_txt, bar = f"{v:+.4f}", min(abs(v), 1.0)
+            note = tx("greek.delta.explain", one=one, value=ctx.money(v * (0.01 if ctx.is_fx else 1), ctx.price_decimals))
+        elif name == "gamma":
+            value_txt, bar = f"{v:.5f}" if not ctx.is_fx else f"{v:.3f}", min(abs(v) / gamma_atm, 1.0) if gamma_atm else 0
+            note = tx("greek.gamma.explain")
+        elif name == "vega":
+            value_txt = f"{v:+.4f}" if not ctx.is_fx else f"{v:+.6f}"
+            bar = min(abs(v) / vega_atm, 1.0) if vega_atm else 0
+            note = tx("greek.vega.explain", value=ctx.money(v, ctx.price_decimals + (1 if ctx.is_fx else 0)))
+        else:
+            value_txt, bar = (f"{v:+.4f}" if not ctx.is_fx else f"{v:+.6f}"), None
+            note = tx(f"greek.{name}.explain", value=ctx.money(v, ctx.price_decimals + (1 if ctx.is_fx else 0)))
+        value_txt = value_txt.replace("-", "−")
+        sign = "" if v == 0 or not math.isfinite(v) else (
+            '<span class="opl-sign pos">+</span>' if v > 0 else '<span class="opl-sign neg">−</span>')
+        bar_html = (f'<div class="bar"><i style="left:0;width:{100 * bar:.1f}%"></i></div>'
+                    if bar is not None else '<div class="bar"></div>')
+        title = t(f"greek.{name}.short") if is_pro() else tx(f"greek.{name}.name")
+        strip.append(
+            '<div class="opl-cell opl-greek">'
+            f'<div><span class="sym">{symbols[name]}</span><span class="name">{html.escape(upper(title))}</span>{sign}</div>'
+            f'<div class="v">{html.escape(value_txt)}</div>'
+            f'<div class="s">{html.escape(upper(t(f"greek.{name}.unit")))}</div>{bar_html}'
+            + ("" if is_pro() else f'<div class="note">{html.escape(note)}</div>')
+            + "</div>"
+        )
+    st.html(f'<div class="opl-grid" style="grid-template-columns:repeat(5, minmax(0, 1fr))">{"".join(strip)}</div>')
+
     if is_pro():
         rows = []
         for name in GREEK_NAMES:
@@ -202,30 +249,8 @@ with right:
                 t("pricer.greeks.col.analytical"), format="%.5f")
         config[t("pricer.greeks.col.maxdiff")] = st.column_config.NumberColumn(
             t("pricer.greeks.col.maxdiff"), format="%.2e", help=t("pricer.greeks.col.maxdiff_help"))
+        st.html('<div style="height:0.6rem"></div>')
         st.dataframe(df, hide_index=True, width="stretch", column_config=config)
-    else:
-        one = "$1" if not ctx.is_fx else "0.01"
-        rows_html = []
-        for name in GREEK_NAMES:
-            v = greek_display(name, getattr(primary, name))
-            if name == "delta":
-                explain_txt = tx("greek.delta.explain", one=one,
-                                 value=ctx.money(v * (0.01 if ctx.is_fx else 1), ctx.price_decimals))
-                big = f"{v:.3f}"
-            elif name == "gamma":
-                explain_txt = tx("greek.gamma.explain")
-                big = f"{v:.4f}" if not ctx.is_fx else f"{v:.2f}"
-            else:
-                big = ctx.money(v, ctx.price_decimals + (1 if ctx.is_fx else 0))
-                explain_txt = tx(f"greek.{name}.explain", value=big)
-            rows_html.append(
-                '<div class="opl-greek-row">'
-                f'<div><div class="opl-greek-name">{html.escape(tx(f"greek.{name}.name"))}</div>'
-                f'<div class="opl-greek-tag">{html.escape(t(f"greek.{name}.short"))}</div></div>'
-                f'<div class="opl-greek-value">{html.escape(big)}</div>'
-                f'<div class="opl-greek-explain">{html.escape(explain_txt)}</div></div>'
-            )
-        st.html(f'<div class="opl-greek-list">{"".join(rows_html)}</div>')
 
     # --------------------------------------------------------------- chart
     section(tx("pricer.chart.title"))
@@ -240,14 +265,14 @@ with right:
     expiry = np.maximum(phi * (grid - spec.K), 0)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=grid, y=expiry, name=tx("pricer.chart.expiry"),
-                             line=dict(color=p.muted, width=2, dash="dash"), hovertemplate="%{y:.4f}"))
+                             line=dict(color=p.label, width=1.5, dash="dash"), hovertemplate="%{y:.4f}"))
     fig.add_trace(go.Scatter(x=grid, y=today, name=tx("pricer.chart.today") + (" (European)" if american and is_pro() else ""),
-                             line=dict(color=p.accent, width=2.5), hovertemplate="%{y:.4f}"))
+                             line=dict(color=p.accent, width=2), hovertemplate="%{y:.4f}"))
     fig.add_trace(go.Scatter(x=[spec.S], y=[headline], mode="markers", name=tx("pricer.chart.spot"),
-                             marker=dict(color=p.accent, size=10, line=dict(color="white", width=2)),
+                             marker=dict(color=p.accent, size=9, symbol="square", line=dict(color=p.canvas, width=2)),
                              hovertemplate="%{y:.4f}"))
-    fig.add_vline(x=spec.K, line=dict(color=p.axis, width=1, dash="dot"),
-                  annotation_text="K" if is_pro() else "Agreed price", annotation_position="top left",
-                  annotation_font_size=11)
+    fig.add_vline(x=spec.K, line=dict(color=p.muted, width=1, dash="dash"),
+                  annotation_text="K" if is_pro() else upper(t("in.K.label")), annotation_position="top left",
+                  annotation_font=dict(size=10, color=p.label))
     style_figure(fig, height=330, x_title=tx("pricer.chart.x"), y_title=tx("pricer.chart.y"))
     show(fig, key="pricer_value_chart")

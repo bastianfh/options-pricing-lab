@@ -9,8 +9,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.content import t
-from app.theme import DASHES, colorscale, palette, show, style_figure
-from app.ui import explain, input_panel, is_pro, page_header, panel, panel_title, section, tx
+from app.theme import DASHES, colorscale, diverging_scale, palette, show, style_figure
+from app.ui import explain, input_panel, is_pro, lbl, page_header, panel, panel_title, section, tx, upper
 from pricing.greeks import GREEK_NAMES, black_scholes_greeks
 
 page_header("gx.title", "gx.lede")
@@ -20,6 +20,7 @@ with left, panel("gx_inputs"):
     panel_title(tx("inputs.contract"))
     spec, _, ctx = input_panel(exercise=False, numerics=False)
 
+GREEK_SYMBOLS = {"delta": "Δ", "gamma": "Γ", "vega": "ν", "theta": "Θ", "rho": "ρ"}
 SCALE = {"vega": 0.01, "theta": 1 / 365, "rho": 0.01}  # market units: per vol pt, per day, per 1%
 
 
@@ -31,9 +32,9 @@ def greek_grid(name: str, S: np.ndarray, T: np.ndarray) -> np.ndarray:
 
 with right:
     choice = st.segmented_control(
-        tx("gx.select"),
+        lbl("gx.select"),
         options=list(GREEK_NAMES),
-        format_func=lambda n: t(f"greek.{n}.short") if is_pro() else tx(f"greek.{n}.name"),
+        format_func=lambda n: f"{GREEK_SYMBOLS[n]} " + upper(t(f"greek.{n}.short") if is_pro() else tx(f"greek.{n}.name")),
         key="gx_greek",
         default="delta",
         required=True,
@@ -68,7 +69,7 @@ with right:
             line=dict(color=ramp[min(i, len(ramp) - 1)], width=2.2),
             hovertemplate="%{y:.4f}",
         ))
-    fig.add_vline(x=spec.K, line=dict(color=p.axis, width=1, dash="dot"),
+    fig.add_vline(x=spec.K, line=dict(color=p.muted, width=1, dash="dash"),
                   annotation_text="K" if is_pro() else t("in.K.label", "Plain English"),
                   annotation_position="top left", annotation_font_size=11)
     fig.add_vline(x=spec.S, line=dict(color=p.accent, width=1, dash="dash"))
@@ -101,7 +102,7 @@ with right:
     lo, hi = float(np.nanmin(z)), float(np.nanmax(z))
     if lo < 0 < hi:  # diverging: two hues around a neutral midpoint at zero
         bound = max(abs(lo), abs(hi))
-        scale = [[0, p.loss], [0.5, "rgba(128,128,128,0.15)"], [1, p.series[0]]]
+        scale = diverging_scale()
         zmin, zmax = -bound, bound
     else:  # one sign: single-hue ramp, darkest at the largest magnitude
         scale = colorscale()
@@ -113,6 +114,6 @@ with right:
         colorbar=dict(thickness=10, outlinewidth=0, tickfont=dict(size=11)),
         hovertemplate=f"{tx('gx.x_spot')}: %{{x:.4f}}<br>{tx('gx.x_time')}: %{{y:.0f}}<br>{label}: %{{z:.4f}}<extra></extra>",
     ))
-    fig.add_vline(x=spec.K, line=dict(color=p.ink, width=1, dash="dot"))
+    fig.add_vline(x=spec.K, line=dict(color=p.label, width=1, dash="dash"))
     style_figure(fig, height=360, x_title=tx("gx.x_spot"), y_title=tx("gx.x_time"), legend=False, hovermode="closest")
     show(fig, key="gx_heat")

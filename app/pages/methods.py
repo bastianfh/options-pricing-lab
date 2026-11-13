@@ -7,11 +7,11 @@ import html
 import streamlit as st
 
 from app.content import METHODS, t
-from app.ui import is_pro, page_header, tx
+from app.ui import is_pro, page_header, upper
 
 page_header("methods.title", "methods.lede")
 
-tabs = st.tabs([m["title"] for m in METHODS])
+tabs = st.tabs([f"[{i:02d}] {upper(m['title'])}" for i, m in enumerate(METHODS, start=1)])
 for tab, method in zip(tabs, METHODS):
     with tab:
         if is_pro():

@@ -13,20 +13,21 @@ import streamlit as st
 from app.content import FX_PAIRS, t
 from app.theme import colorscale, palette, show, style_figure, style_scene
 from app.ui import (
-    panel,
-    panel_title,
     _on_asset_change,
     _on_pair_change,
     cached,
-    card,
+    cells,
     context,
     explain,
     init_state,
     is_pro,
+    lbl,
     page_header,
+    panel,
+    panel_title,
     section,
-    stat,
     tx,
+    upper,
 )
 from pricing.implied_vol import (
     SmileParameters,
@@ -46,38 +47,38 @@ with left, panel("vs_inputs"):
     source = "synthetic"
     if is_pro():
         source = st.segmented_control(
-            tx("vs.source"), ["synthetic", "upload"], format_func=lambda v: tx(f"vs.source.{v}"),
+            lbl("vs.source"), ["synthetic", "upload"], format_func=lambda v: upper(tx(f"vs.source.{v}")),
             key="vs_source", default="synthetic", required=True, label_visibility="collapsed",
             persist_state="session", width="stretch",
         )
     uploaded = None
     if source == "upload":
-        uploaded = st.file_uploader(t("vs.upload.help"), type=["csv"], key="vs_upload")
+        uploaded = st.file_uploader(upper(t("vs.upload.help")), type=["csv"], key="vs_upload")
     else:
-        st.slider(tx("vs.atm"), 3.0, 80.0, 20.0, 0.5, key="vs_atm", help=tx("vs.atm.help"), persist_state="session")
-        st.slider(tx("vs.skew"), -0.30, 0.30, -0.10, 0.01, key="vs_skew", help=tx("vs.skew.help"), persist_state="session")
-        st.slider(tx("vs.curv"), 0.0, 0.30, 0.06, 0.01, key="vs_curv", help=tx("vs.curv.help"), persist_state="session")
-        st.slider(tx("vs.term"), -0.15, 0.15, 0.03, 0.01, key="vs_term", help=tx("vs.term.help"), persist_state="session")
+        st.slider(lbl("vs.atm"), 3.0, 80.0, 20.0, 0.5, key="vs_atm", help=tx("vs.atm.help"), persist_state="session")
+        st.slider(lbl("vs.skew"), -0.30, 0.30, -0.10, 0.01, key="vs_skew", help=tx("vs.skew.help"), persist_state="session")
+        st.slider(lbl("vs.curv"), 0.0, 0.30, 0.06, 0.01, key="vs_curv", help=tx("vs.curv.help"), persist_state="session")
+        st.slider(lbl("vs.term"), -0.15, 0.15, 0.03, 0.01, key="vs_term", help=tx("vs.term.help"), persist_state="session")
 
     st.html('<div style="height:0.8rem"></div>')
     panel_title(tx("inputs.market"))
     st.segmented_control(
-        tx("in.asset.label"), ["stock", "fx"], format_func=lambda v: tx(f"in.asset.{v}"), key="in_asset",
+        lbl("in.asset.label"), ["stock", "fx"], format_func=lambda v: upper(tx(f"in.asset.{v}")), key="in_asset",
         required=True, on_change=_on_asset_change, persist_state="session", width="stretch",
     )
     ctx = context()
     if ctx.is_fx:
-        st.selectbox(tx("in.pair.label"), list(FX_PAIRS), key="in_pair", on_change=_on_pair_change,
+        st.selectbox(lbl("in.pair.label"), list(FX_PAIRS), key="in_pair", on_change=_on_pair_change,
                      persist_state="session")
         ctx = context()
     fmt = "%.4f" if ctx.is_fx else "%.2f"
-    st.number_input(tx("in.S.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_S",
+    st.number_input(lbl("in.S.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_S",
                     help=tx("in.S.help"), persist_state="session")
     rate_key, carry_key = ("in.r_fx", "in.q_fx") if ctx.is_fx else ("in.r", "in.q")
     names = dict(base=ctx.base, quote=ctx.quote)
-    st.number_input(tx(f"{rate_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_r",
+    st.number_input(lbl(f"{rate_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_r",
                     help=tx(f"{rate_key}.help"), persist_state="session")
-    st.number_input(tx(f"{carry_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_q",
+    st.number_input(lbl(f"{carry_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_q",
                     help=tx(f"{carry_key}.help"), persist_state="session")
 
 s = st.session_state
@@ -160,8 +161,9 @@ with right:
     # ----------------------------------------------------------- 3D surface
     section(tx("vs.surface.title"))
     fig = go.Figure(go.Surface(
-        x=moneyness, y=surface.expiries, z=vols_pct, colorscale=colorscale(),
-        colorbar=dict(thickness=10, len=0.6, outlinewidth=0, title=dict(text="%", side="top")),
+        x=moneyness, y=surface.expiries, z=vols_pct, colorscale=colorscale("vol"),
+        colorbar=dict(thickness=8, len=0.6, x=0.94, outlinewidth=0, title=dict(text="%", side="top"),
+                      tickfont=dict(family="JetBrains Mono, monospace", size=10)),
         contours=dict(z=dict(show=True, usecolormap=True, project=dict(z=False), width=1)),
         hovertemplate=(f"{tx('vs.x_moneyness')}: %{{x:.3f}}<br>{tx('vs.y_expiry')}: %{{y:.2f}}"
                        f"<br>{tx('vs.z_vol')}: %{{z:.2f}}<extra></extra>"),
@@ -177,7 +179,7 @@ with right:
         picks = [i for i, T in enumerate(surface.expiries) if np.isclose(T, [1 / 12, 3 / 12, 6 / 12, 1.0, 2.0]).any()]
         if len(picks) < 2:
             picks = list(range(min(5, len(surface.expiries))))
-        ramp = p.ramp[::-1][: len(picks)] if len(picks) <= len(p.ramp) else p.ramp
+        ramp = p.vol_ramp[::-1][: len(picks)] if len(picks) <= len(p.vol_ramp) else p.vol_ramp
         fig = go.Figure()
         for n, i in enumerate(picks):
             T = surface.expiries[i]
@@ -185,7 +187,7 @@ with right:
             fig.add_trace(go.Scatter(x=moneyness, y=vols_pct[i], name=label, mode="lines",
                                      line=dict(color=ramp[min(n, len(ramp) - 1)], width=2.2),
                                      hovertemplate="%{y:.2f}%"))
-        fig.add_vline(x=1.0, line=dict(color=p.axis, width=1, dash="dot"))
+        fig.add_vline(x=1.0, line=dict(color=p.muted, width=1, dash="dash"))
         style_figure(fig, height=340, x_title=tx("vs.x_moneyness"), y_title=tx("vs.z_vol"))
         show(fig, key="vs_chart_smiles")
     with c2:
@@ -197,7 +199,7 @@ with right:
             ok = np.isfinite(row)
             atm.append(np.interp(np.log(F), np.log(surface.strikes[ok]), row[ok]) * 100 if ok.sum() > 1 else np.nan)
         fig = go.Figure(go.Scatter(x=surface.expiries, y=atm, mode="lines+markers", name="ATM",
-                                   line=dict(color=p.accent, width=2.2), marker=dict(size=8),
+                                   line=dict(color=p.vol, width=2), marker=dict(size=7, symbol="square"),
                                    hovertemplate="%{y:.2f}%"))
         style_figure(fig, height=340, x_title=tx("vs.y_expiry"), y_title=tx("vs.z_vol"), legend=False)
         show(fig, key="vs_chart_term")
@@ -206,9 +208,10 @@ with right:
     if is_pro() and diag is not None:
         section(t("vs.diag.title"))
         with st.container(key="vs_diag"):
-            d1, d2, d3, d4 = st.columns(4)
-            d1.html(stat(t("vs.diag.solved"), f"{diag['solved']}/{diag['points']}", size="md"))
-            d2.html(stat(t("vs.diag.max_err"), f"{diag['max_err']:.1e}", size="md"))
-            d3.html(stat(t("vs.diag.newton"), f"{100 * diag['newton_share']:.0f}%", size="md"))
-            d4.html(stat(t("vs.diag.iters"), f"{diag['mean_iters']:.1f}", size="md"))
+            st.html(cells([
+                (t("vs.diag.solved"), f"{diag['solved']}/{diag['points']}", "", "pos"),
+                (t("vs.diag.max_err"), f"{diag['max_err']:.1e}", "", ""),
+                (t("vs.diag.newton"), f"{100 * diag['newton_share']:.0f}%", "", ""),
+                (t("vs.diag.iters"), f"{diag['mean_iters']:.1f}", "", ""),
+            ]))
         st.html(f'<p class="opl-note">{html.escape(tx("vs.insight"))}</p>')
