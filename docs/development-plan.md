@@ -73,3 +73,16 @@ options-pricing-lab/
 1. **Engine:** all six components, with 313 tests plus 2 doctests (textbook values, no-arbitrage, convergence orders, MC statistics, IV round trips, Greeks).
 2. **UI:** seven pages, a Plain English / Pro switch bound to `?mode=`, persistent inputs across pages, presets.
 3. **Polish:** screenshot review in light, dark and phone-width layouts; README figure generated from the library; CI on Python 3.12 and 3.13.
+
+## Visual redesign (after the first release)
+
+The first version used the default "AI SaaS" look: Tailwind indigo, Inter, identical rounded cards with soft shadows, uppercase eyebrow labels and callout boxes. The redesign gives it a point of view suited to a pricing tool:
+
+| Choice | Detail |
+|---|---|
+| Palette | Cool paper `#f5f7f6`, slate ink `#16212a`, petrol accent `#0d5c61`; green/red reserved for gains and losses. Dark mode uses deep petrol-slate, not neutral black. |
+| Type | One family, Archivo, with its width axis as the expressive variable: headings semi-expanded, body at normal width, all figures tabular. |
+| Surfaces | Inputs sit on a tinted panel; results are open text and tables, not cards. |
+| Signature element | The method ledger: prices aligned on the decimal point, with digits that diverge from the reference faded, so agreement is visible at a glance. |
+| Removed | Card grids, eyebrow labels, the stat strip, callout boxes, arrows on links, and "·"-joined meta strings. |
+| Fixed | Page title clipped under the top bar on phones; copy that said "on the left" when inputs sit above on a phone. |

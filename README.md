@@ -2,8 +2,8 @@
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://options-pricing-lab-bastianfh.streamlit.app/)
 [![tests](https://github.com/bastianfh/options-pricing-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/bastianfh/options-pricing-lab/actions/workflows/tests.yml)
-![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-4f46e5)
-![License: MIT](https://img.shields.io/badge/license-MIT-4f46e5)
+![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-0d5c61)
+![License: MIT](https://img.shields.io/badge/license-MIT-0d5c61)
 
 **An app that prices options four different ways and shows they all land on the same answer. I wrote the pricing maths myself instead of using an existing library.**
 
