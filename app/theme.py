@@ -1,204 +1,218 @@
-"""Design tokens and the shared Plotly chart theme.
+"""Design tokens and the shared Plotly chart theme ("quant desk x industrial hardware").
 
-Every chart in the app goes through :func:`style_figure`, so fonts, gridlines,
-hover labels, margins and series colours are defined once here.
+Every chart in the app goes through :func:`style_figure` (or :func:`style_scene`
+for 3D), so fonts, gridlines, hover readouts, margins and series colours are
+defined once here. The app is locked to a single matte dark palette that
+mirrors ``.streamlit/config.toml``.
 
 Colour roles
 ------------
-* ``accent``     the single brand accent (petrol); used for the primary series
-* ``series``     fixed categorical order for multi-series charts
-                 (validated for colour-vision deficiency in both modes)
-* ``gain/loss``  green/red reserved for profit and loss
-* ``ramp``       single-hue ordinal ramp for multi-expiry lines
-* ``surface_scale`` single-hue petrol scale for heatmaps and the vol surface
-
-Light and dark values are separate selections, mirroring
-``.streamlit/config.toml``. Background and font colours are left to
-Streamlit's Plotly theme so charts follow the active theme client-side.
+* ``accent``      signal orange: the active parameter / primary series
+* ``positive``    emerald: calls, long, profit, in the money
+* ``negative``    crimson: puts, short, loss, out of the money
+* ``vol``         amber: volatility and secondary mathematical series
+* ``series``      fixed categorical order for multi-series charts; every
+                  series also gets its own dash and marker so colour is never
+                  the only cue (emerald vs crimson is a red-green pair)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 
 import plotly.graph_objects as go
 import streamlit as st
 
-FONT_FAMILY = "Archivo, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+MONO = "'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace"
+SANS = "Inter, -apple-system, 'Segoe UI', sans-serif"
 
 
 @dataclass(frozen=True)
 class Palette:
-    """Colour tokens for one theme mode."""
+    """Colour tokens (single dark palette)."""
 
-    accent: str
-    accent_soft: str
-    ink: str
-    muted: str
-    grid: str
-    axis: str
-    gain: str
-    loss: str
-    gain_fill: str
-    loss_fill: str
-    reference: str
-    card: str
-    card_shadow: str
+    canvas: str
+    panel: str
+    well: str
     rule: str
+    grid: str
+    ink: str
+    label: str
+    muted: str
+    accent: str
+    positive: str
+    negative: str
+    vol: str
+    positive_fill: str
+    negative_fill: str
     series: tuple[str, ...]
     ramp: tuple[str, ...]
-    surface_scale: tuple[str, ...]
+    vol_ramp: tuple[str, ...]
+    heat_scale: tuple[str, ...]
+    vol_scale: tuple[str, ...]
+
+    # Aliases used by older call sites.
+    @property
+    def muted_ink(self) -> str:
+        return self.muted
+
+    @property
+    def axis(self) -> str:
+        return self.muted
+
+    @property
+    def reference(self) -> str:
+        return self.ink
+
+    @property
+    def gain(self) -> str:
+        return self.positive
+
+    @property
+    def loss(self) -> str:
+        return self.negative
+
+    @property
+    def gain_fill(self) -> str:
+        return self.positive_fill
+
+    @property
+    def loss_fill(self) -> str:
+        return self.negative_fill
 
 
-LIGHT = Palette(
-    accent="#0d5c61",
-    accent_soft="rgba(13, 92, 97, 0.08)",
-    ink="#16212a",
-    muted="#5a6670",
-    grid="rgba(22, 33, 42, 0.07)",
-    axis="rgba(22, 33, 42, 0.24)",
-    gain="#1f7a4d",
-    loss="#b42318",
-    gain_fill="rgba(31, 122, 77, 0.11)",
-    loss_fill="rgba(180, 35, 24, 0.09)",
-    reference="#16212a",
-    card="#e9eeec",
-    card_shadow="none",
-    rule="rgba(22, 33, 42, 0.12)",
-    # blue, orange, aqua, yellow: validated categorical order (adjacent CVD dE >= 9)
-    series=("#2a78d6", "#eb6834", "#1baf7a", "#eda100"),
-    ramp=("#7dbab4", "#4c9e98", "#24827d", "#126866", "#08474a"),
-    surface_scale=("#d9ecea", "#9fd0cb", "#4fa39d", "#16706f", "#0a3f42"),
+PALETTE = Palette(
+    canvas="#0A0A0B",
+    panel="#111113",
+    well="#161619",
+    rule="#222226",
+    grid="#1C1C20",
+    ink="#F4F4F6",
+    label="#8E8E93",
+    muted="#48484D",
+    accent="#FF5500",
+    positive="#00E676",
+    negative="#FF3B30",
+    vol="#FFB800",
+    positive_fill="rgba(0, 230, 118, 0.10)",
+    negative_fill="rgba(255, 59, 48, 0.10)",
+    # orange, amber, emerald, technical grey
+    series=("#FF5500", "#FFB800", "#00E676", "#8E8E93"),
+    # ordinal ramps: dim -> bright (brightest = most salient on the dark canvas)
+    ramp=("#6B2A0A", "#A33A08", "#D94A04", "#FF5500", "#FF8F57"),
+    vol_ramp=("#6B4D00", "#A37600", "#D99C00", "#FFB800", "#FFD25C"),
+    heat_scale=("#161619", "#3D1A0B", "#8A330B", "#FF5500", "#FFB38A"),
+    vol_scale=("#161619", "#3A2C08", "#8A6400", "#FFB800", "#FFE08A"),
 )
 
-DARK = Palette(
-    accent="#5fb4ae",
-    accent_soft="rgba(95, 180, 174, 0.12)",
-    ink="#e1e7e5",
-    muted="#95a3a8",
-    grid="rgba(225, 231, 229, 0.07)",
-    axis="rgba(225, 231, 229, 0.24)",
-    gain="#45b880",
-    loss="#ef7468",
-    gain_fill="rgba(69, 184, 128, 0.13)",
-    loss_fill="rgba(239, 116, 104, 0.12)",
-    reference="#e1e7e5",
-    card="#182225",
-    card_shadow="none",
-    rule="rgba(225, 231, 229, 0.12)",
-    series=("#3987e5", "#d95926", "#199e70", "#c98500"),
-    ramp=("#1e6b68", "#2f8a85", "#4fa8a2", "#7cc6c0", "#aee0db"),
-    surface_scale=("#0a3f42", "#16706f", "#4fa39d", "#9fd0cb", "#d9ecea"),
-)
-
-# Line dashes and markers give every series a second, non-colour encoding.
 DASHES = ("solid", "dash", "dot", "dashdot")
-MARKERS = ("circle", "square", "diamond", "triangle-up")
+MARKERS = ("square", "diamond", "circle", "triangle-up")
 
 
 def is_dark() -> bool:
-    """Whether the active Streamlit theme is dark (defaults to light if unknown)."""
-    try:
-        return st.context.theme.type == "dark"
-    except Exception:  # pragma: no cover - outside a Streamlit runtime
-        return False
+    """The app is locked to dark mode."""
+    return True
 
 
 def palette() -> Palette:
-    """Palette for the active theme."""
-    return DARK if is_dark() else LIGHT
+    return PALETTE
 
 
 def style_figure(
     fig: go.Figure,
     *,
-    height: int = 380,
+    height: int = 360,
     x_title: Optional[str] = None,
     y_title: Optional[str] = None,
     legend: bool = True,
     hovermode: str = "x unified",
 ) -> go.Figure:
-    """Apply the shared chart theme in place and return the figure."""
-    p = palette()
+    """Apply the shared instrument chart theme in place and return the figure."""
+    p = PALETTE
     axis = dict(
         showgrid=True,
         gridcolor=p.grid,
         gridwidth=1,
         zeroline=False,
         showline=True,
-        linecolor=p.axis,
+        linecolor=p.rule,
         linewidth=1,
+        mirror=True,
         ticks="outside",
-        tickcolor=p.axis,
-        ticklen=4,
-        tickfont=dict(size=12),
-        title=dict(font=dict(size=12.5), standoff=10),
+        tickcolor=p.rule,
+        ticklen=3,
+        tickfont=dict(family=MONO, size=10, color=p.label),
+        title=dict(font=dict(family=MONO, size=10, color=p.label), standoff=8),
+        showspikes=True,
+        spikecolor=p.muted,
+        spikethickness=1,
+        spikedash="solid",
+        spikemode="across",
         automargin=True,
     )
     fig.update_layout(
         height=height,
-        font=dict(family=FONT_FAMILY, size=13),
-        margin=dict(l=8, r=12, t=28 if legend else 12, b=8),
+        font=dict(family=MONO, size=11, color=p.label),
+        margin=dict(l=8, r=10, t=30 if legend else 10, b=8),
         colorway=list(p.series),
         hovermode=hovermode,
-        hoverlabel=dict(font=dict(family=FONT_FAMILY, size=12.5), bordercolor=p.axis),
+        hoverlabel=dict(bgcolor=p.canvas, bordercolor=p.rule, font=dict(family=MONO, size=11, color=p.ink)),
         showlegend=legend,
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.0,
-            xanchor="left",
-            x=0.0,
-            bgcolor="rgba(0,0,0,0)",
-            font=dict(size=12.5),
-            itemclick="toggleothers",
+            orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0.0,
+            bgcolor="rgba(0,0,0,0)", font=dict(family=MONO, size=10, color=p.label), itemclick="toggleothers",
         ),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor=p.panel,
     )
     fig.update_xaxes(**axis)
     fig.update_yaxes(**axis)
     if x_title is not None:
-        fig.update_xaxes(title_text=x_title)
+        fig.update_xaxes(title_text=x_title.upper())
     if y_title is not None:
-        fig.update_yaxes(title_text=y_title)
+        fig.update_yaxes(title_text=y_title.upper())
     return fig
 
 
-def style_scene(fig: go.Figure, *, x_title: str, y_title: str, z_title: str, height: int = 560) -> go.Figure:
+def style_scene(fig: go.Figure, *, x_title: str, y_title: str, z_title: str, height: int = 520) -> go.Figure:
     """Shared styling for 3D surface charts."""
-    p = palette()
+    p = PALETTE
     axis = dict(
-        backgroundcolor="rgba(0,0,0,0)",
-        gridcolor=p.axis,
-        showbackground=False,
+        backgroundcolor=p.panel,
+        gridcolor=p.rule,
+        showbackground=True,
         zeroline=False,
-        tickfont=dict(size=11),
-        title=dict(font=dict(size=12)),
+        tickfont=dict(family=MONO, size=10, color=p.label),
+        title=dict(font=dict(family=MONO, size=10, color=p.label)),
     )
     fig.update_layout(
         height=height,
-        font=dict(family=FONT_FAMILY, size=12),
-        margin=dict(l=0, r=0, t=10, b=0),
+        font=dict(family=MONO, size=10, color=p.label),
+        margin=dict(l=0, r=0, t=6, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         scene=dict(
-            xaxis=dict(axis, title_text=x_title),
-            yaxis=dict(axis, title_text=y_title),
-            zaxis=dict(axis, title_text=z_title),
+            xaxis=dict(axis, title_text=x_title.upper()),
+            yaxis=dict(axis, title_text=y_title.upper()),
+            zaxis=dict(axis, title_text=z_title.upper()),
             camera=dict(eye=dict(x=1.3, y=-1.45, z=0.5), center=dict(x=0, y=0, z=-0.15)),
             aspectmode="manual",
             aspectratio=dict(x=1.25, y=1.0, z=0.7),
         ),
-        hoverlabel=dict(font=dict(family=FONT_FAMILY, size=12.5)),
+        hoverlabel=dict(bgcolor=p.canvas, bordercolor=p.rule, font=dict(family=MONO, size=11, color=p.ink)),
     )
     return fig
 
 
-def colorscale() -> list[list]:
-    """Single-hue sequential colour scale for heatmaps and surfaces."""
-    steps = palette().surface_scale
+def colorscale(kind: Literal["heat", "vol"] = "heat") -> list[list]:
+    """Restrained single-hue colour scale: orange for sensitivities, amber for volatility."""
+    steps = PALETTE.vol_scale if kind == "vol" else PALETTE.heat_scale
     return [[i / (len(steps) - 1), c] for i, c in enumerate(steps)]
+
+
+def diverging_scale() -> list[list]:
+    """Crimson (negative) -> well (zero) -> emerald (positive)."""
+    return [[0.0, PALETTE.negative], [0.5, PALETTE.well], [1.0, PALETTE.positive]]
 
 
 PLOTLY_CONFIG = {
@@ -210,5 +224,5 @@ PLOTLY_CONFIG = {
 
 
 def show(fig: go.Figure, key: Optional[str] = None) -> None:
-    """Render a styled figure with the shared config (Streamlit supplies theme-aware font/background)."""
-    st.plotly_chart(fig, theme="streamlit", config=PLOTLY_CONFIG, key=key)
+    """Render a styled figure. The theme is fully explicit, so Streamlit's own chart theme is disabled."""
+    st.plotly_chart(fig, theme=None, config=PLOTLY_CONFIG, key=key)
