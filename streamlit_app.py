@@ -10,10 +10,14 @@ tabs, live parameter readout, Plain/Pro switch), then the selected tool from
 
 from __future__ import annotations
 
+# Import pandas up front, in the main script, before any page runs. Plotly imports it
+# lazily, and a page switch during the very first load could otherwise import it from
+# two script threads at once ("partially initialized module 'pandas'").
+import pandas  # noqa: F401
 import streamlit as st
 
 from app.content import t
-from app.ui import handle_navigation, init_state, inject_css, render_topbar, reset_module_index
+from app.ui import handle_navigation, init_mode, init_state, inject_css, render_topbar, reset_module_index
 
 st.set_page_config(page_title=t("app.name"), layout="wide", initial_sidebar_state="collapsed")
 
@@ -27,6 +31,7 @@ PAGES = {
 }
 
 init_state()
+init_mode()
 navigation = st.navigation(list(PAGES.values()), position="hidden")
 handle_navigation(PAGES)
 current = next(key for key, page in PAGES.items() if page.title == navigation.title)

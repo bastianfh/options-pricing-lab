@@ -91,6 +91,31 @@ def _on_nav() -> None:
         st.session_state["_goto"] = target
 
 
+def init_mode() -> None:
+    """Set the explanation mode once per session, honouring a shared ``?mode=Pro`` link.
+
+    The toggle is deliberately *not* bound to the URL with ``bind="query-params"``:
+    ``st.switch_page`` clears query parameters on every page change, and Streamlit
+    refuses to clear a bound parameter, which crashed page switches in Pro mode.
+    Instead the mode lives in session state and the URL is updated by hand.
+    """
+    if "mode" not in st.session_state:
+        requested = str(st.query_params.get("mode", "")).strip().lower()
+        st.session_state["mode"] = PRO if requested == "pro" else PLAIN
+
+
+def _mode_query_params() -> dict[str, str]:
+    return {"mode": PRO} if st.session_state.get("mode") == PRO else {}
+
+
+def _sync_mode_param() -> None:
+    """Keep ``?mode=Pro`` in the address bar so the current view can be shared."""
+    if st.session_state.get("mode") == PRO:
+        st.query_params["mode"] = PRO
+    elif "mode" in st.query_params:
+        del st.query_params["mode"]
+
+
 def render_topbar(current: str) -> None:
     """Telemetry bar: wordmark, mechanical tool tabs, live parameter readout, status LED, Plain/Pro switch."""
     s = st.session_state
@@ -123,11 +148,11 @@ def render_topbar(current: str) -> None:
             upper(t("mode.label")),
             options=[PLAIN, PRO],
             key="mode",
-            default=PLAIN,
             required=True,
-            bind="query-params",
+            on_change=_sync_mode_param,
             help=t("mode.help"),
             label_visibility="collapsed",
+            persist_state="session",
         )
 
 
@@ -556,7 +581,7 @@ def handle_navigation(pages: dict[str, st.Page]) -> None:
     """Follow a pending page switch requested by a callback (callbacks cannot switch pages)."""
     target = st.session_state.pop("_goto", None)
     if target and target in pages:
-        st.switch_page(pages[target])
+        st.switch_page(pages[target], query_params=_mode_query_params() or None)
 
 
 def cached(fn: Callable) -> Callable:
