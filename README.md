@@ -65,7 +65,7 @@ Black-Scholes gives an exact answer for simple options, so I can check the other
 
 The Validation page in the app has the full charts and tables.
 
-There are also **315 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and more. They run automatically on GitHub every time I push code.
+There are also **328 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
 
 ## Run it on your own computer
 
