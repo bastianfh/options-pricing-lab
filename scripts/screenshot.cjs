@@ -39,7 +39,12 @@ const context = await browser.newContext({
 const page = await context.newPage();
 let failed = false;
 for (const name of pages) {
-  const query = mode === "pro" ? `?mode=Pro${extraQuery}` : (extraQuery ? `?${extraQuery.slice(1)}` : "");
+  // The first-run guide is off by default here so page screenshots stay clean (--query guide=on to show it).
+  const params = [];
+  if (mode === "pro") params.push("mode=Pro");
+  if (!extraQuery.includes("guide=")) params.push("guide=off");
+  if (extraQuery) params.push(extraQuery.slice(1));
+  const query = `?${params.join("&")}`;
   await page.goto(`${url}/${PATHS[name]}${query}`, { waitUntil: "networkidle" });
   await page.waitForSelector('[data-testid="stApp"]', { timeout: 30000 });
   await page.waitForTimeout(1500);

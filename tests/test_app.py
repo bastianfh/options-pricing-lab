@@ -18,6 +18,7 @@ PAGES = ["pricer", "greeks", "payoff", "surface", "validation", "methods"]
 
 def _start(mode: str | None) -> AppTest:
     at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["guide"] = "off"  # keep the first-run guide out of the navigation tests
     if mode:
         at.query_params["mode"] = mode
     at.run()
@@ -39,3 +40,32 @@ def test_switching_to_every_page_works_in_both_modes(target: str, mode: str | No
 def test_shared_pro_link_opens_in_pro_mode() -> None:
     at = _start("Pro")
     assert at.session_state["mode"] == "Pro"
+
+
+def test_first_run_guide_opens_and_walks_through_every_step() -> None:
+    """A first-time visitor (no cookie) gets the guide; clicking through every step closes it cleanly."""
+    from app.guide import STEPS
+
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["guide_active"] is True
+
+    for expected_step in range(1, len(STEPS)):
+        at.button(key="guide_next").click().run()
+        assert not at.exception, [e.message for e in at.exception]
+        assert at.session_state["guide_step"] == expected_step
+
+    at.button(key="guide_finish").click().run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["guide_active"] is False
+
+
+def test_guide_can_be_skipped_and_reopened() -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.run()
+    at.button(key="guide_skip").click().run()
+    assert at.session_state["guide_active"] is False
+    at.button(key="guide_btn").click().run()  # GUIDE in the top bar
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["guide_active"] is True and at.session_state["guide_step"] == 0
