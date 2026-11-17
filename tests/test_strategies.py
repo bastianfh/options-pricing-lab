@@ -1,5 +1,7 @@
 """Multi-leg strategy payoffs, P&L and risk metrics."""
 
+import math
+
 import numpy as np
 import pytest
 
@@ -96,3 +98,38 @@ def test_all_presets_build_and_price() -> None:
 def test_from_legs_drops_zero_quantities() -> None:
     s = from_legs("custom", [Leg("call", 1, 100), Leg("put", 0, 90)])
     assert len(s.legs) == 1
+
+
+def test_quoted_premiums_override_model_cost() -> None:
+    s = Strategy("Spread", (Leg("call", 1, 100, premium=5.20), Leg("call", -1, 110, premium=1.80)))
+    assert s.cost(100, 0.5, **MKT) == pytest.approx(5.20 - 1.80)
+    mixed = Strategy("Mixed", (Leg("stock", 1), Leg("call", -1, 110, premium=1.80)))
+    assert mixed.cost(100, 0.5, **MKT) == pytest.approx(100 - 1.80)
+
+
+def test_leg_volatility_override() -> None:
+    low = Leg("call", 1, 100, sigma=0.10)
+    assert float(low.value(np.array(100.0), 0.5, MKT["r"], 0.40)) == pytest.approx(
+        black_scholes_price(100, 100, 0.5, MKT["r"], 0.10, 0.0, "call"))
+    assert low.greeks(100, 0.5, MKT["r"], 0.40).vega == pytest.approx(
+        black_scholes_greeks(100, 100, 0.5, MKT["r"], 0.10, 0.0, "call").vega)
+
+
+def test_probability_of_profit_matches_closed_form_for_a_long_call() -> None:
+    """A long call profits when S_T > K + cost, which has risk-neutral probability N(d2) at that strike."""
+    from scipy.stats import norm
+
+    from pricing.strategies import probability_of_profit
+
+    S0, K, T, r, sigma = 100.0, 105.0, 0.5, 0.04, 0.3
+    s = Strategy("Long call", (Leg("call", 1, K),))
+    cost = s.cost(S0, T, r, sigma)
+    breakeven = K + cost
+    d2 = (math.log(S0 / breakeven) + (r - 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    assert probability_of_profit(s, cost, S0, T, r, sigma) == pytest.approx(norm.cdf(d2), abs=2e-3)
+
+
+def test_expected_move() -> None:
+    from pricing.strategies import expected_move
+
+    assert expected_move(100.0, 0.25, 0.2) == pytest.approx(10.0)

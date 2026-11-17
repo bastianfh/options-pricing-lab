@@ -312,3 +312,60 @@ def surface_from_chains(
             if m.any():
                 prices[i, m] = black_scholes_price(spot, strikes[m], T, r, vols[i, m], q, kind)
     return VolSurface(strikes, expiries, vols, prices, types)
+
+
+@dataclass(frozen=True)
+class LegQuote:
+    """A listed option chosen for a strategy leg, priced at the side of the market you trade on."""
+
+    kind: str
+    strike: float
+    bid: float
+    ask: float
+    mid: float
+    fill: float  # buy at the ask, sell at the bid (falling back to mid, then last trade)
+    iv: float  # implied vol of the mid (or fill) from the lab's solver; nan if not solvable
+
+
+def leg_quote(
+    calls: pd.DataFrame,
+    puts: pd.DataFrame,
+    kind: str,
+    target_strike: float,
+    quantity: float,
+    spot: float,
+    years: float,
+    r: float,
+    q: float,
+) -> Optional[LegQuote]:
+    """Snap ``target_strike`` to the nearest listed strike and price the leg from live quotes.
+
+    Long legs (``quantity > 0``) fill at the ask and short legs at the bid, which is what a
+    retail order would actually pay or receive. Returns ``None`` if the chain has no usable
+    quote for that option type.
+    """
+    frame = calls if kind == "call" else puts
+    if frame is None or frame.empty:
+        return None
+    f = frame.copy()
+    for col in ("bid", "ask", "lastPrice"):
+        if col not in f:
+            f[col] = np.nan
+    bid_s, ask_s, last_s = f["bid"].astype(float), f["ask"].astype(float), f["lastPrice"].astype(float)
+    usable = ((bid_s > 0) & (ask_s >= bid_s)) | (last_s > 0)
+    f = f[usable]
+    if f.empty:
+        return None
+    row = f.iloc[int(np.argmin(np.abs(f["strike"].astype(float) - target_strike)))]
+    bid, ask, last = float(row["bid"]), float(row["ask"]), float(row["lastPrice"])
+    two_sided = bid > 0 and ask >= bid
+    mid = (bid + ask) / 2.0 if two_sided else last
+    if quantity > 0:
+        fill = ask if ask > 0 else mid
+    else:
+        fill = bid if bid > 0 else mid
+    try:
+        iv = implied_volatility(mid if mid > 0 else fill, spot, float(row["strike"]), years, r, q, kind)
+    except ValueError:
+        iv = float("nan")
+    return LegQuote(kind, float(row["strike"]), bid, ask, mid, float(fill), iv)

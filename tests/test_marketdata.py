@@ -204,3 +204,16 @@ def test_fetch_chain_expiries_and_risk_free(fake_yfinance: None) -> None:
     calls, puts = fetch.fetch_chain("AAPL", "2026-12-18")
     assert len(calls) == len(puts) > 0
     assert fetch.fetch_risk_free() == pytest.approx(math.log1p(0.04125))
+
+
+def test_leg_quote_snaps_to_listed_strike_and_crosses_the_spread() -> None:
+    from marketdata.parse import leg_quote
+
+    calls, puts = synthetic_chain(100.0, 0.25, 0.25, 0.03, 0.0)  # strikes every 5, 1% either side of model
+    buy = leg_quote(calls, puts, "call", 103.0, 1, 100.0, 0.25, 0.03, 0.0)
+    sell = leg_quote(calls, puts, "call", 103.0, -1, 100.0, 0.25, 0.03, 0.0)
+    assert buy.strike == sell.strike == 105.0
+    assert buy.fill == pytest.approx(buy.ask) and sell.fill == pytest.approx(sell.bid)
+    assert buy.fill > buy.mid > sell.fill
+    assert buy.iv == pytest.approx(0.25, rel=1e-6)  # the mid is exactly the model price
+    assert leg_quote(pd.DataFrame(), puts, "call", 100.0, 1, 100.0, 0.25, 0.03, 0.0) is None

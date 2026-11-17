@@ -12,7 +12,7 @@ The presets follow the standard definitions in Hull, ch. 12.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Literal, Sequence
+from typing import Callable, Literal, Optional, Sequence
 
 import numpy as np
 
@@ -34,11 +34,19 @@ class Leg:
         Signed number of units: positive for long, negative for short.
     strike
         Option strike (ignored for stock).
+    sigma
+        Optional volatility for this leg (e.g. its own market implied vol). When ``None``,
+        the strategy-wide volatility is used.
+    premium
+        Optional entry price per unit (e.g. a live bid or ask). When ``None``, the leg's
+        entry cost is its model value.
     """
 
     kind: LegKind
     quantity: float
     strike: float = 0.0
+    sigma: Optional[float] = None
+    premium: Optional[float] = None
 
     def payoff(self, S_T: np.ndarray) -> np.ndarray:
         """Value of the leg at expiry for terminal prices ``S_T``."""
@@ -54,13 +62,21 @@ class Leg:
         S = np.asarray(S, dtype=float)
         if self.kind == "stock":
             return self.quantity * S
-        return self.quantity * np.asarray(black_scholes_price(S, self.strike, T, r, sigma, q, self.kind))
+        vol = self.sigma if self.sigma is not None else sigma
+        return self.quantity * np.asarray(black_scholes_price(S, self.strike, T, r, vol, q, self.kind))
+
+    def entry_cost(self, S0: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
+        """What it costs to put the leg on: ``quantity * premium`` if a premium is set, else model value."""
+        if self.premium is not None:
+            return float(self.quantity * self.premium)
+        return float(self.value(np.array(S0), T, r, sigma, q))
 
     def greeks(self, S: float, T: float, r: float, sigma: float, q: float = 0.0) -> Greeks:
         """Black-Scholes Greeks of the leg, scaled by quantity (stock: delta = quantity)."""
         if self.kind == "stock":
             return Greeks(self.quantity, 0.0, 0.0, 0.0, 0.0)
-        g = black_scholes_greeks(S, self.strike, T, r, sigma, q, self.kind)
+        vol = self.sigma if self.sigma is not None else sigma
+        g = black_scholes_greeks(S, self.strike, T, r, vol, q, self.kind)
         return Greeks(*(self.quantity * v for v in (g.delta, g.gamma, g.vega, g.theta, g.rho)))
 
 
@@ -81,8 +97,11 @@ class Strategy:
         return sum((leg.value(S, T, r, sigma, q) for leg in self.legs), start=np.zeros_like(S))
 
     def cost(self, S0: float, T: float, r: float, sigma: float, q: float = 0.0) -> float:
-        """Cost of entering the position today (negative means a net credit)."""
-        return float(self.value(np.array(S0), T, r, sigma, q))
+        """Cost of entering the position today (negative means a net credit).
+
+        Uses each leg's quoted ``premium`` when set (live market prices), otherwise model values.
+        """
+        return float(sum(leg.entry_cost(S0, T, r, sigma, q) for leg in self.legs))
 
     def pnl_at_expiry(self, S_T: np.ndarray, entry_cost: float) -> np.ndarray:
         """P&L at expiry: payoff minus entry cost."""
@@ -101,6 +120,31 @@ class Strategy:
             g = leg.greeks(S, T, r, sigma, q)
             totals += [g.delta, g.gamma, g.vega, g.theta, g.rho]
         return Greeks(*(float(x) for x in totals))
+
+
+def probability_of_profit(
+    strategy: "Strategy", entry_cost: float, S0: float, T: float, r: float, sigma: float, q: float = 0.0,
+    n: int = 4001,
+) -> float:
+    """Risk-neutral probability that the expiry P&L is positive.
+
+    Integrates the indicator ``payoff(S_T) - entry_cost > 0`` against the lognormal density
+    of :math:`S_T` under Black-Scholes, :math:`\\ln S_T \\sim N(\\ln S_0 + (r - q - \\tfrac12\\sigma^2)T,\\ \\sigma^2 T)`,
+    on a fine grid in standard-normal space. This is a model probability: it uses the
+    risk-neutral drift and a single volatility, so it is a guide, not a forecast.
+    """
+    if T <= 0 or sigma <= 0:
+        return float(strategy.pnl_at_expiry(np.array([S0]), entry_cost)[0] > 0)
+    z = np.linspace(-8, 8, n)
+    s_t = S0 * np.exp((r - q - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * z)
+    weights = np.exp(-0.5 * z**2)
+    profitable = strategy.pnl_at_expiry(s_t, entry_cost) > 0
+    return float(np.sum(weights * profitable) / np.sum(weights))
+
+
+def expected_move(S0: float, T: float, sigma: float) -> float:
+    """One-standard-deviation move implied by ``sigma`` over ``T`` years: :math:`S_0\\sigma\\sqrt{T}`."""
+    return float(S0 * sigma * np.sqrt(max(T, 0.0)))
 
 
 def breakevens(S_grid: np.ndarray, pnl: np.ndarray) -> list[float]:
