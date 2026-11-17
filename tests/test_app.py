@@ -106,3 +106,35 @@ def test_market_option_chain_builds_a_surface() -> None:
     assert at.session_state["nav_tool"] == "surface"
     assert at.session_state["mk_surface"]["ticker"] == "AAPL"
     assert at.session_state["vs_source"] == "market"
+
+
+# Note: Streamlit's AppTest cannot re-run a page whose select boxes use format_func (it fails while
+# serialising their state), so these tests set widget state before a single run instead of clicking.
+
+@pytest.mark.parametrize("strategy", ["covered_call", "collar", "iron_condor", "long_straddle", "buy_and_hold"])
+def test_backtest_page_runs_every_kind_of_strategy(strategy: str) -> None:
+    at = _start("Pro")
+    at.session_state["bt_strategy"] = strategy
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["nav_tool"] == "backtest"
+    assert at.session_state["bt_start"] and at.session_state["bt_end"]  # range recorded for share links
+
+
+def test_payoff_live_chain_mode_is_off_by_default() -> None:
+    at = _start(None)
+    at.session_state["_goto"] = "payoff"
+    at.run()
+    assert not at.exception and at.session_state["pay_live"] is False
+
+
+@pytest.mark.parametrize("strategy", ["bull_call_spread", "covered_call", "straddle"])
+def test_payoff_live_chain_mode_prices_legs_from_quotes(strategy: str) -> None:
+    at = _start("Pro")
+    at.session_state["pay_live"] = True
+    at.session_state["pay_strategy"] = strategy
+    at.session_state["_goto"] = "payoff"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["pay_expiry"] in ("2026-12-18", "2027-01-15")

@@ -1,0 +1,108 @@
+"""Shareable links and downloadable reports."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import pytest
+from streamlit.testing.v1 import AppTest
+
+from app.report import Report, build_html
+from app.share import ALL_PARAMS, PAGE_PARAMS
+
+APP = str(Path(__file__).resolve().parent.parent / "streamlit_app.py")
+
+
+def test_param_names_are_unique_per_page() -> None:
+    from app.share import COMMON
+
+    for page, params in PAGE_PARAMS.items():
+        names = [p.name for p in COMMON + params]
+        assert len(names) == len(set(names)), page
+
+
+@pytest.mark.parametrize(
+    "name,raw,expected",
+    [("S", "352.78", 352.78), ("days", "45", 45), ("live", "1", True), ("bt", "iron_condor", "iron_condor"),
+     ("ticker", "brk.b", "BRK-B"), ("from", "2024-01-31", "2024-01-31")],
+)
+def test_params_cast_valid_values(name: str, raw: str, expected: object) -> None:
+    param = next(p for p in ALL_PARAMS if p.name == name)
+    assert param.cast(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "name,raw",
+    [("S", "-5"), ("days", "99999"), ("live", "yes"), ("bt", "martingale"), ("ticker", "AAPL;DROP"),
+     ("from", "not-a-date"), ("vol", "nan-ish")],
+)
+def test_params_reject_bad_values(name: str, raw: str) -> None:
+    param = next(p for p in ALL_PARAMS if p.name == name)
+    with pytest.raises((ValueError, TypeError)):
+        param.cast(raw)
+
+
+def test_shared_link_settings_are_applied_and_bad_ones_ignored() -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    for k, v in {"guide": "off", "S": "123.5", "vol": "31", "type": "put", "days": "-4", "a": "crypto"}.items():
+        at.query_params[k] = v
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["in_S"] == 123.5 and at.session_state["in_vol"] == 31.0
+    assert at.session_state["in_option_type"] == "put"
+    assert at.session_state["in_days"] == 182        # out of range -> default kept
+    assert at.session_state["in_asset"] == "stock"   # unknown choice -> default kept
+
+
+def test_share_url_round_trips_through_the_app() -> None:
+    from app.share import share_url
+
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["guide"] = "off"
+    at.query_params["K"] = "105"
+    at.run()
+    state = {p.key: at.session_state[p.key] for p in ALL_PARAMS if p.key in at.session_state}
+
+    import streamlit as st
+
+    for key, value in state.items():
+        st.session_state[key] = value
+    try:
+        url = share_url("pricer", base_url="https://example.app/")
+    finally:
+        for key in state:
+            del st.session_state[key]
+    parts = urlsplit(url)
+    query = {k: v[0] for k, v in parse_qs(parts.query).items()}
+    assert parts.scheme == "https" and parts.netloc == "example.app" and parts.path == "/"
+    assert query["K"] == "105" and query["guide"] == "off"
+
+
+def test_report_html_contains_every_section_and_works_offline() -> None:
+    r = Report(title="Strategy backtest", subtitle="Covered call on KO")
+    r.params("Setup", {"Ticker": "KO", "Tenor": 30})
+    r.metrics("Results", [("Total return", "+12.3%"), ("Sharpe", "0.81")])
+    r.figure("Equity curve", go.Figure(go.Scatter(x=[1, 2, 3], y=[100, 101, 103])))
+    r.table("Trades", pd.DataFrame({"pnl": np.arange(600.0)}), max_rows=50)
+    r.text("Method", "Line one.\nLine two.")
+    r.share_link = "https://example.app/backtest?bt=covered_call"
+    r.data_source = "Yahoo Finance"
+    doc = build_html(r)
+    for needle in ("Strategy backtest", "Covered call on KO", "Ticker", "+12.3%", "Equity curve",
+                   "First 50 of 600 rows", "Line two.", "bt=covered_call", "Yahoo Finance", "How to cite"):
+        assert needle in doc, needle
+    assert doc.count("Plotly.newPlot") == 1
+    # plotly.js is embedded once, not loaded from a CDN, so the report works offline.
+    assert "<script src=" not in doc and len(doc) > 1_000_000
+    assert "<script>" not in r.title  # titles are escaped
+
+
+def test_report_escapes_user_text() -> None:
+    r = Report(title="<script>alert(1)</script>")
+    r.params("Setup", {"<b>": "<img src=x onerror=alert(1)>"})
+    doc = build_html(r)
+    assert "<script>alert(1)</script>" not in doc and "<img src=x" not in doc
