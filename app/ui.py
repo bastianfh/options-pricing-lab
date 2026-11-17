@@ -82,7 +82,7 @@ def reset_module_index() -> None:
     st.session_state["_mod_idx"] = 0
 
 
-NAV_ORDER = ["pricer", "greeks", "payoff", "surface", "validation", "methods"]
+NAV_ORDER = ["pricer", "market", "greeks", "payoff", "surface", "validation", "methods"]
 
 
 def _on_nav() -> None:
@@ -141,9 +141,10 @@ def render_topbar(current: str) -> None:
             '<div class="opl-telemetry">'
             f"<span>MODEL <b>{model}</b></span>"
             f"<span>r <b>{float(s.get('in_r', 0)):.2f}%</b></span>"
-            f"<span>σ <b>{float(s.get('in_vol', 0)):.1f}%</b></span>"
-            f"<span>T <b>{int(s.get('in_days', 0))}d</b></span>"
-            '<span><i class="opl-led"></i><b>LIVE</b></span>'
+            f"<span class=\"opt\">σ <b>{float(s.get('in_vol', 0)):.1f}%</b></span>"
+            f"<span class=\"opt\">T <b>{int(s.get('in_days', 0))}d</b></span>"
+            + (f"<span>DATA <b>{html.escape(str(s['mk_sent']))}</b></span>" if s.get("mk_sent") else "")
+            + '<span><i class="opl-led"></i><b>LIVE</b></span>'
             "</div>"
         )
         st.space("stretch")

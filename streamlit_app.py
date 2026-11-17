@@ -24,6 +24,7 @@ st.set_page_config(page_title=t("app.name"), layout="wide", initial_sidebar_stat
 
 PAGES = {
     "pricer": st.Page("app/pages/pricer.py", title=t("nav.pricer"), default=True),
+    "market": st.Page("app/pages/market.py", title=t("nav.market"), url_path="market"),
     "greeks": st.Page("app/pages/greeks.py", title=t("nav.greeks"), url_path="greeks"),
     "payoff": st.Page("app/pages/payoff.py", title=t("nav.payoff"), url_path="payoff"),
     "surface": st.Page("app/pages/surface.py", title=t("nav.surface"), url_path="surface"),

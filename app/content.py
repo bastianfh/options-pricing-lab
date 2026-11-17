@@ -45,10 +45,12 @@ TEXT: dict[str, Entry] = {
     "nav.surface": "Volatility surface",
     "nav.validation": "Validation",
     "nav.methods": "Methods",
+    "nav.market": "Market data",
+    "navshort.market": "Market",
     "navshort.pricer": "Pricer",
     "navshort.greeks": "Greeks",
     "navshort.payoff": "Payoff",
-    "navshort.surface": "Vol surface",
+    "navshort.surface": "Surface",
     "navshort.validation": "Validation",
     "navshort.methods": "Methods",
     "sidebar.footer": "Pricing engine written from scratch in NumPy & SciPy. No pricing libraries.",
@@ -86,11 +88,12 @@ TEXT: dict[str, Entry] = {
     ),
     "guide.tools.title": "The tools",
     "guide.tools.body": (
-        "Across the top are six tools. You're on [PRICER] now.\n"
+        "Across the top are seven tools. You're on [PRICER] now.\n"
         "- [PRICER]: price one option and see what drives it\n"
+        "- [MARKET]: load a real US stock and use its numbers\n"
         "- [GREEKS]: watch how the risks change with price and time\n"
         "- [PAYOFF]: see what a strategy makes or loses\n"
-        "- [VOL SURFACE]: see how much movement the market expects\n"
+        "- [SURFACE]: see how much movement the market expects\n"
         "- [VALIDATION]: proof that the maths is right\n"
         "- [METHODS]: how each model works"
     ),
@@ -716,6 +719,111 @@ TEXT: dict[str, Entry] = {
     "table.se": "Std. error",
     "table.ci": "95% CI",
     "table.contains": "CI ∋ BS",
+
+    # ----------------------------------------------------------- market data
+    "mk.title": {"plain": "Real stock data", "pro": "Market data"},
+    "mk.lede": {
+        "plain": "Load any US stock to see how it has behaved, then send its real numbers to the pricer.",
+        "pro": "Daily history, realised volatility, return statistics and the live option chain for a US equity.",
+    },
+    "mk.source": {"plain": "Pick a stock", "pro": "Source"},
+    "mk.source.ticker": {"plain": "Search a ticker", "pro": "Ticker"},
+    "mk.source.upload": {"plain": "Upload a file", "pro": "Upload CSV"},
+    "mk.ticker": {"plain": "Ticker symbol", "pro": "Ticker"},
+    "mk.ticker.help": {
+        "plain": "The short code a stock trades under, like AAPL for Apple. Pick one or type your own.",
+        "pro": "Any US-listed symbol Yahoo Finance knows (BRK.B and BRK-B both work). Type to add one not listed.",
+    },
+    "mk.period": {"plain": "How much history", "pro": "History"},
+    "mk.load": "Load",
+    "mk.upload": {"plain": "Price history (CSV)", "pro": "Price history CSV"},
+    "mk.upload.help": (
+        "A CSV of daily prices with a date column and a closing-price column. Downloads from Yahoo "
+        "Finance, Nasdaq.com and Stooq work as they are. An optional Dividends column is used for the yield."
+    ),
+    "mk.upload.sample": "Download a template CSV",
+    "mk.loading": "Loading {ticker} from Yahoo Finance…",
+    "mk.empty": "Pick a ticker and press LOAD, or upload a CSV of daily prices.",
+    "mk.source_note": "Source: {source}. Last close {date}. Prices are delayed and for research only.",
+    "mk.snapshot": {"plain": "At a glance", "pro": "Snapshot"},
+    "mk.last": {"plain": "Last price", "pro": "Last close [S]"},
+    "mk.change": {"plain": "Change on the day", "pro": "1D change"},
+    "mk.range": "52-week range",
+    "mk.yield": {"plain": "Dividend yield", "pro": "Dividend yield [q]"},
+    "mk.hv": {"plain": "Typical movement, {w}", "pro": "Realised vol {w}"},
+    "mk.rf": {"plain": "Interest rate (T-bill)", "pro": "Risk-free [r] (13w T-bill)"},
+    "mk.rf_na": "n/a",
+    "mk.explain": (
+        "{ticker} last closed at {price}. Over the past year it moved about {hv1y:.0%} a year (its historical "
+        "volatility), and over the last month about {hv30:.0%}. It pays a dividend yield of {q:.2%}."
+    ),
+    "mk.send.title": {"plain": "Use these numbers", "pro": "Send to the lab"},
+    "mk.send.lede": {
+        "plain": "Fill the pricer with this stock's real price, movement, dividend yield and interest rate.",
+        "pro": "Sets S, K (at the money), σ, q and r in the Pricer. Days to expiry are kept.",
+    },
+    "mk.send.sigma": {"plain": "Which movement figure to use", "pro": "Volatility input [σ]"},
+    "mk.send.sigma.help": {
+        "plain": "Recent periods react faster to news; a full year is steadier. Implied volatility is what option buyers are paying for right now.",
+        "pro": "Realised vol over a trailing window, or the at-the-money implied vol of the loaded expiry.",
+    },
+    "mk.send.atm_iv": {"plain": "Market's expectation", "pro": "ATM implied"},
+    "mk.send.button": {"plain": "Send to the pricer", "pro": "Send to Pricer"},
+    "mk.history.title": {"plain": "Price over time", "pro": "Price history"},
+    "mk.history.close": {"plain": "Price", "pro": "Close (adjusted)"},
+    "mk.history.ma50": "50-day average",
+    "mk.history.ma200": "200-day average",
+    "mk.history.y": {"plain": "Price", "pro": "Price"},
+    "mk.vol.title": {"plain": "How jumpy it has been", "pro": "Rolling realised volatility"},
+    "mk.vol.lede": {
+        "plain": "Each line is the stock's yearly movement measured over a sliding window. Spikes are turbulent periods.",
+        "pro": "Annualised standard deviation of daily log returns over 21- and 63-day windows.",
+    },
+    "mk.vol.y": {"plain": "Movement per year (%)", "pro": "σ (%)"},
+    "mk.vol.atm": {"plain": "Option market now", "pro": "ATM implied"},
+    "mk.returns.title": {"plain": "Good days and bad days", "pro": "Return distribution"},
+    "mk.returns.lede": {
+        "plain": "How often the stock rose or fell by each amount in a day. The grey curve is what a perfectly 'normal' stock would do; real stocks have more extreme days.",
+        "pro": "Daily log returns against a normal density with the same mean and variance. Excess kurtosis > 0 means fat tails.",
+    },
+    "mk.returns.x": {"plain": "Daily change (%)", "pro": "Daily log return (%)"},
+    "mk.returns.y": {"plain": "How often", "pro": "Density"},
+    "mk.returns.normal": {"plain": "Normal curve", "pro": "Normal fit"},
+    "mk.returns.actual": {"plain": "Actual days", "pro": "Empirical"},
+    "mk.stat.return": {"plain": "Yearly return", "pro": "Annualised return"},
+    "mk.stat.vol": {"plain": "Yearly movement", "pro": "Annualised vol"},
+    "mk.stat.sharpe": {"plain": "Return per unit of risk", "pro": "Sharpe ratio"},
+    "mk.stat.drawdown": {"plain": "Worst fall from a peak", "pro": "Max drawdown"},
+    "mk.stat.skew": {"plain": "Lopsidedness", "pro": "Skewness"},
+    "mk.stat.kurt": {"plain": "Extreme days", "pro": "Excess kurtosis"},
+    "mk.stat.worst": {"plain": "Worst day", "pro": "Worst day"},
+    "mk.stat.best": {"plain": "Best day", "pro": "Best day"},
+    "mk.chain.title": {"plain": "What options on this stock cost", "pro": "Option chain"},
+    "mk.chain.lede": {
+        "plain": "Live quotes for options on this stock. The app turns each price back into the movement the market expects, using its own solver, and compares with Yahoo's figure.",
+        "pro": "Out-of-the-money quotes (mid, or last trade if one-sided), inverted with the lab's Newton/bisection solver and compared with Yahoo's IV. US equity options are American; BS IV is the market convention.",
+    },
+    "mk.chain.expiry": {"plain": "Expiry date", "pro": "Expiry"},
+    "mk.chain.none": "No listed options found for this stock.",
+    "mk.chain.only_live": "Option chains are available for tickers loaded from Yahoo Finance, not for uploaded files.",
+    "mk.chain.ours": {"plain": "This app", "pro": "Lab solver"},
+    "mk.chain.yahoo": "Yahoo",
+    "mk.chain.x": {"plain": "Agreed price", "pro": "Strike K"},
+    "mk.chain.y": {"plain": "Expected movement (%)", "pro": "Implied vol (%)"},
+    "mk.chain.surface": {"plain": "Build the full market surface", "pro": "Build market vol surface"},
+    "mk.chain.surface.help": "Loads several expiries and opens them on the Volatility surface page.",
+    "mk.chain.building": "Loading {n} expiries…",
+    "mk.col.type": "Type",
+    "mk.col.strike": "Strike",
+    "mk.col.bid": "Bid",
+    "mk.col.ask": "Ask",
+    "mk.col.price": "Price used",
+    "mk.col.iv": "IV (lab)",
+    "mk.col.yahoo_iv": "IV (Yahoo)",
+    "mk.col.volume": "Volume",
+    "mk.col.oi": "Open interest",
+    "vs.source.market": {"plain": "Real market ({ticker})", "pro": "Market ({ticker})"},
+    "vs.market.note": "Market quotes for {ticker} on {date}: {n} out-of-the-money options across {k} expiries.",
 
     # -------------------------------------------------------------- methods
     "methods.title": {"plain": "How it works", "pro": "Methods"},

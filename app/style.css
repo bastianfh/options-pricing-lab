@@ -229,6 +229,9 @@ html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"] { backgrou
 
 a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 1px solid var(--accent) !important; outline-offset: 2px; }
 
+/* Secondary telemetry readouts give way first when the bar gets crowded. */
+@media (max-width: 1600px) { .opl-telemetry span.opt { display: none; } }
+
 /* ---------- phones ---------- */
 @media (max-width: 760px) {
   .block-container, [data-testid="stMainBlockContainer"] { padding: 0.5rem 0.6rem 2rem 0.6rem !important; }
