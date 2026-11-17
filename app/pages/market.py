@@ -78,7 +78,7 @@ with left, panel("market_inputs"):
         )
         st.button(upper(t("mk.load")), key="mk_load", type="primary", on_click=_on_load, width="stretch")
     else:
-        uploaded = st.file_uploader(lbl("mk.upload"), type=["csv"], key="mk_upload", help=t("mk.upload.help"))
+        uploaded = st.file_uploader(lbl("mk.upload"), type=list(parse.UPLOAD_TYPES), key="mk_upload", help=t("mk.upload.help"))
         template = pd.DataFrame({
             "Date": pd.bdate_range(end=date.today(), periods=5).strftime("%Y-%m-%d"),
             "Close": [100.0, 101.2, 100.7, 102.3, 103.1],
@@ -100,7 +100,7 @@ if source == "ticker":
         error = str(exc)
 elif uploaded is not None:
     try:
-        hist = parse.parse_price_csv(uploaded.getvalue(), uploaded.name.rsplit(".", 1)[0].upper())
+        hist = parse.parse_price_file(uploaded.getvalue(), uploaded.name)
     except MarketDataError as exc:
         error = str(exc)
 

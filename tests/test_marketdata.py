@@ -217,3 +217,100 @@ def test_leg_quote_snaps_to_listed_strike_and_crosses_the_spread() -> None:
     assert buy.fill > buy.mid > sell.fill
     assert buy.iv == pytest.approx(0.25, rel=1e-6)  # the mid is exactly the model price
     assert leg_quote(pd.DataFrame(), puts, "call", 100.0, 1, 100.0, 0.25, 0.03, 0.0) is None
+
+
+# --------------------------------------------------------------------------- Excel uploads
+
+def _xlsx(sheets: dict[str, list[list[object]]]) -> bytes:
+    """Build an .xlsx workbook in memory from rows of cell values."""
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    for name, rows in sheets.items():
+        ws = wb.create_sheet(name)
+        for row in rows:
+            ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _factset_rows(n: int = 60) -> list[list[object]]:
+    """A FactSet-style export: title block, blank line, header, newest-first data, footer note."""
+    days = business_days(n)[::-1]
+    prices = np.linspace(230.0, 200.0, n)
+    rows: list[list[object]] = [["Apple Inc. (AAPL-US)"], ["Price History, Daily, USD"], [], ["Date", "Price", "Volume"]]
+    rows += [[d.to_pydatetime(), float(p), 1_000_000] for d, p in zip(days, prices)]
+    rows += [[], ["Source: FactSet Prices"]]
+    return rows
+
+
+def test_factset_style_excel_skips_title_block_and_footer() -> None:
+    from marketdata.parse import parse_price_file
+
+    h = parse_price_file(_xlsx({"Price History": _factset_rows()}), "AAPL_prices.xlsx")
+    assert len(h.dates) == 60 and h.dates.is_monotonic_increasing
+    assert h.last_price == pytest.approx(230.0) and h.last_date == date(2026, 11, 16)
+    assert h.label == "AAPL_PRICES" and h.source == "Uploaded Excel"
+
+
+def test_excel_uses_the_first_sheet_with_prices() -> None:
+    from marketdata.parse import parse_price_file
+
+    data = _xlsx({"Notes": [["Report generated for class"], ["See next sheet"]], "Data": _factset_rows()})
+    h = parse_price_file(data, "export.xlsx", label="AAPL")
+    assert h.label == "AAPL" and "Data" in h.source
+
+
+def test_excel_serial_dates_blank_date_header_and_no_header() -> None:
+    from marketdata.parse import parse_price_file
+
+    days = business_days(45)
+    serials = [(d - pd.Timestamp("1899-12-30")).days for d in days]  # dates stored as plain numbers
+    prices = list(np.linspace(50, 60, 45))
+    blank_date_header = [[None, "Close Price"]] + [[s, p] for s, p in zip(serials, prices)]
+    h = parse_price_file(_xlsx({"S": blank_date_header}), "x.xlsx")
+    assert h.dates[0] == days[0] and h.last_price == pytest.approx(60.0)
+
+    headerless = [[d.to_pydatetime(), p] for d, p in zip(days, prices)]
+    h2 = parse_price_file(_xlsx({"S": headerless}), "y.xlsx")
+    assert len(h2.dates) == 45 and h2.last_price == pytest.approx(60.0)
+
+
+@pytest.mark.parametrize("header", ["Close*", "Adj. Close", "PX_LAST", "Closing Price", "CLOSE_PRICE"])
+def test_close_header_variants(header: str) -> None:
+    from marketdata.parse import parse_price_file
+
+    rows = [["Date", header]] + [[d.to_pydatetime(), 10.0 + i] for i, d in enumerate(business_days(40))]
+    assert parse_price_file(_xlsx({"S": rows}), "z.xlsx").last_price == pytest.approx(49.0)
+
+
+def test_unreadable_and_unsupported_files_get_clear_messages() -> None:
+    from marketdata.parse import parse_price_file
+
+    with pytest.raises(MarketDataError, match="Excel workbook"):
+        parse_price_file(b"not really a workbook", "broken.xlsx")
+    with pytest.raises(MarketDataError, match="PDF"):
+        parse_price_file(b"%PDF-1.7", "prices.pdf")
+    with pytest.raises(MarketDataError, match="Unsupported"):
+        parse_price_file(b"data", "prices.numbers")
+    with pytest.raises(MarketDataError, match="Couldn't find a table"):
+        parse_price_file(_xlsx({"Notes": [["just text"], ["more text"]]}), "notes.xlsx")
+
+
+def test_xls_files_use_the_xlrd_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    from marketdata import parse as parse_module
+
+    seen = {}
+
+    def fake_read_excel(buffer, **kwargs):
+        seen.update(kwargs)
+        rows = [["Date", "Close"]] + [[d, 5.0 + i] for i, d in enumerate(business_days(35))]
+        return {"Sheet1": pd.DataFrame(rows)}
+
+    monkeypatch.setattr(parse_module.pd, "read_excel", fake_read_excel)
+    h = parse_module.parse_price_file(b"\xd0\xcf\x11\xe0", "legacy.xls")
+    assert seen["engine"] == "xlrd" and h.last_price == pytest.approx(39.0)

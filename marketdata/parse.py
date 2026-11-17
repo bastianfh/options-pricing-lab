@@ -2,14 +2,17 @@
 
 Nothing here touches the network, so every function can be tested with fixtures.
 
-CSV formats accepted
---------------------
-Any CSV with a date column and a price column. Recognised layouts include:
+File formats accepted
+---------------------
+CSV (``.csv``) and Excel (``.xlsx``, ``.xlsm``, ``.xls``) files with a date column and a
+price column. Recognised layouts include:
 
 * Yahoo Finance download: ``Date, Open, High, Low, Close, Adj Close, Volume``
 * Nasdaq.com historical data: ``Date, Close/Last, Volume, Open, High, Low`` (prices like ``$187.44``)
 * Stooq: ``Date, Open, High, Low, Close, Volume``
-* Anything simple: ``date, close`` or ``Date, Price``
+* FactSet and other Excel exports: a title block above the table is skipped automatically,
+  the first sheet that contains prices is used, and dates stored as Excel serial numbers work
+* Anything simple: ``date, close`` or ``Date, Price``, with or without a header row
 
 An optional ``Dividends`` column (cash per share on payment dates) is used for the
 dividend yield. Adjusted close, when present, is used for returns and volatility so
@@ -100,9 +103,22 @@ class PriceHistory:
 # Price histories
 # ---------------------------------------------------------------------------
 
-_DATE_NAMES = ("date", "datetime", "timestamp", "time", "day")
-_CLOSE_NAMES = ("close/last", "close", "price", "last", "adj close", "adj_close", "adjclose")
-_ADJ_NAMES = ("adj close", "adj_close", "adjclose", "adjusted close", "adjusted_close")
+# Header names are compared after normalising (lower case, punctuation and repeated spaces removed),
+# so "Close*", "Adj. Close" and "PX_LAST" all match.
+_DATE_NAMES = ("date", "datetime", "timestamp", "time", "day", "trade date", "as of date", "pricing date")
+_CLOSE_NAMES = ("close/last", "close", "closing price", "close price", "price close", "last price", "price",
+                "last", "pxlast", "adj close", "adjusted close", "adjclose")
+_ADJ_NAMES = ("adj close", "adjusted close", "adjclose", "adj close price", "adjusted closing price")
+_DIV_NAMES = ("dividends", "dividend", "dividend amount", "dividends per share")
+_NOT_CLOSE = ("open", "high", "low", "change", "target", "volume", "bid", "ask")
+
+
+def _norm(name: object) -> str:
+    """Normalise a column header for matching."""
+    import re
+
+    text = re.sub(r"[^a-z0-9/ ]", "", str(name).lower().replace("_", " "))
+    return " ".join(text.split())
 
 
 def _to_number(series: pd.Series) -> pd.Series:
@@ -120,6 +136,25 @@ def _find(columns: dict[str, str], names: tuple[str, ...]) -> Optional[str]:
     return None
 
 
+def _find_close(columns: dict[str, str]) -> Optional[str]:
+    """The closing-price column: an exact known name, else any header mentioning close or price."""
+    exact = _find(columns, _CLOSE_NAMES)
+    if exact is not None:
+        return exact
+    for key, col in columns.items():
+        if ("close" in key or "price" in key) and not any(word in key for word in _NOT_CLOSE):
+            return col
+    return None
+
+
+def _to_dates(series: pd.Series) -> pd.Series:
+    """Parse dates, including Excel serial day numbers (e.g. 45610 = 2024-11-14)."""
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.notna().mean() > 0.8 and numeric.dropna().between(20000, 80000).all():
+        return pd.to_datetime(numeric, unit="D", origin="1899-12-30", utc=True)
+    return pd.to_datetime(series, errors="coerce", utc=True, format="mixed")
+
+
 def history_from_frame(
     frame: pd.DataFrame,
     label: str,
@@ -134,18 +169,20 @@ def history_from_frame(
     df = frame.copy()
     if date_col is None and isinstance(df.index, pd.DatetimeIndex):
         df = df.reset_index()
-    cols = {str(c).strip().lower(): c for c in df.columns}
+    cols = {_norm(c): c for c in df.columns}
     dcol = date_col or _find(cols, _DATE_NAMES) or (df.columns[0] if len(df.columns) else None)
-    ccol = _find(cols, _CLOSE_NAMES)
+    ccol = _find_close(cols)
     if dcol is None or ccol is None:
         raise MarketDataError(
             "Could not find a date column and a closing-price column. "
             "Expected headers like 'Date' and 'Close' (or 'Close/Last', 'Price')."
         )
     acol = _find(cols, _ADJ_NAMES)
-    divcol = cols.get("dividends")
+    if acol == ccol:
+        acol = None
+    divcol = _find(cols, _DIV_NAMES)
 
-    dates = pd.to_datetime(df[dcol], errors="coerce", utc=True, format="mixed")
+    dates = _to_dates(df[dcol])
     out = pd.DataFrame({
         "date": dates.dt.tz_convert(None).dt.normalize(),
         "close": _to_number(df[ccol]),
@@ -181,6 +218,115 @@ def parse_price_csv(data: bytes, label: str) -> PriceHistory:
     if frame.empty:
         raise MarketDataError("That CSV has no rows.")
     return history_from_frame(frame, label=label, source="Uploaded CSV")
+
+
+EXCEL_TYPES = ("xlsx", "xlsm", "xls")
+UPLOAD_TYPES = ("csv", *EXCEL_TYPES)
+
+
+def _mostly_dates(values: pd.Series) -> bool:
+    v = values.dropna()
+    return len(v) >= MIN_ROWS and _to_dates(v).notna().mean() >= 0.8
+
+
+def _mostly_numbers(values: pd.Series) -> bool:
+    v = values.dropna()
+    return len(v) >= MIN_ROWS and _to_number(v).notna().mean() >= 0.8
+
+
+def _table_from_sheet(raw: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """Locate the price table on a sheet read with ``header=None``.
+
+    Looks in the first 50 rows for a header row with a price-like name (and ideally a date-like
+    name), which skips title blocks such as FactSet's. A missing date header is filled in from
+    the first column that holds dates. With no header at all, the first date column and the
+    first numeric column after it are used.
+    """
+    raw = raw.dropna(how="all").dropna(axis=1, how="all").reset_index(drop=True)
+    if raw.empty:
+        return None
+    def close_column(lookup: dict[str, int]) -> Optional[int]:
+        exact = next((lookup[n] for n in _CLOSE_NAMES if n in lookup), None)
+        if exact is not None:
+            return exact
+        return next((j for n, j in lookup.items()
+                     if ("close" in n or "price" in n) and len(n) <= 30 and not any(w in n for w in _NOT_CLOSE)), None)
+
+    candidates = []
+    for i in range(min(50, len(raw))):
+        names = [_norm(v) if pd.notna(v) else "" for v in raw.iloc[i]]
+        lookup = {n: j for j, n in enumerate(names) if n}
+        if len(lookup) < 2:  # a title line such as "Price History, Daily, USD" is a single cell
+            continue
+        close_j = close_column(lookup)
+        if close_j is None:
+            continue
+        date_j = next((lookup[n] for n in _DATE_NAMES if n in lookup), None)
+        candidates.append((date_j is None, i, names, close_j, date_j))
+    # Prefer a header naming both a date and a price column; otherwise infer the date column.
+    for _, i, names, close_j, date_j in sorted(candidates, key=lambda c: (c[0], c[1])):
+        body = raw.iloc[i + 1:].reset_index(drop=True)
+        headers = [str(raw.iloc[i, j]).strip() if names[j] else f"column_{j}" for j in range(raw.shape[1])]
+        if date_j is None:
+            date_j = next((j for j in range(raw.shape[1]) if j != close_j and _mostly_dates(body.iloc[:, j])), None)
+            if date_j is None:
+                continue
+        headers[date_j] = "Date"
+        body.columns = headers
+        return body
+    # No header row: first date-like column, then the first numeric column after it.
+    date_j = next((j for j in range(raw.shape[1]) if _mostly_dates(raw.iloc[:, j])), None)
+    if date_j is None:
+        return None
+    close_j = next((j for j in range(date_j + 1, raw.shape[1]) if _mostly_numbers(raw.iloc[:, j])), None)
+    if close_j is None:
+        return None
+    return pd.DataFrame({"Date": raw.iloc[:, date_j], "Close": raw.iloc[:, close_j]})
+
+
+def parse_price_excel(data: bytes, label: str, extension: str = "xlsx") -> PriceHistory:
+    """Parse an Excel workbook of daily prices, using the first sheet that contains a price table."""
+    engine = "xlrd" if extension == "xls" else "openpyxl"
+    try:
+        sheets = pd.read_excel(io.BytesIO(data), sheet_name=None, header=None, engine=engine)
+    except ImportError as exc:  # pragma: no cover - both engines are in requirements.txt
+        raise MarketDataError(f"Reading .{extension} files needs the '{engine}' package.") from exc
+    except Exception as exc:
+        raise MarketDataError(
+            "That file isn't a readable Excel workbook. If it's password-protected, save an unprotected copy."
+        ) from exc
+    problems = []
+    for name, raw in sheets.items():
+        table = _table_from_sheet(raw)
+        if table is None:
+            continue
+        try:
+            source = "Uploaded Excel" if len(sheets) == 1 else f"Uploaded Excel, sheet '{name}'"
+            return history_from_frame(table, label=label, source=source, date_col="Date" if "Date" in table else None)
+        except MarketDataError as exc:
+            problems.append(f"'{name}': {exc}")
+    detail = f" ({'; '.join(problems)})" if problems else ""
+    raise MarketDataError(
+        "Couldn't find a table of dates and closing prices in that workbook. Make sure one sheet has a "
+        f"date column and a price column (headed e.g. 'Date' and 'Price' or 'Close').{detail}"
+    )
+
+
+def parse_price_file(data: bytes, filename: str, label: Optional[str] = None) -> PriceHistory:
+    """Parse an uploaded price history, choosing the reader from the file extension."""
+    stem, _, ext = filename.rpartition(".")
+    ext = ext.lower() if stem else ""
+    label = label or (stem or filename).upper()
+    if ext in ("csv", "txt"):
+        return parse_price_csv(data, label)
+    if ext in EXCEL_TYPES:
+        return parse_price_excel(data, label, ext)
+    if ext == "pdf":
+        raise MarketDataError(
+            "PDFs can't be read reliably (table columns shift and numbers get split). "
+            "Export the price history to Excel or CSV instead."
+        )
+    raise MarketDataError(f"Unsupported file type '.{ext}'. Upload a CSV or Excel file (.xlsx, .xls).")
 
 
 # ---------------------------------------------------------------------------

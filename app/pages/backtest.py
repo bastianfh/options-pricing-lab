@@ -65,7 +65,7 @@ with left, panel("bt_inputs"):
                              width="stretch")
         st.button(upper(t("mk.load")), key="bt_load", on_click=_apply_ticker, width="stretch")
     else:
-        uploaded = st.file_uploader(lbl("mk.upload"), type=["csv"], key="bt_upload", help=t("mk.upload.help"))
+        uploaded = st.file_uploader(lbl("mk.upload"), type=list(parse.UPLOAD_TYPES), key="bt_upload", help=t("mk.upload.help"))
 
     st.html('<div style="height:0.6rem"></div>')
     panel_title(tx("bt.strategy"))
@@ -108,7 +108,7 @@ if source == "ticker":
         error = str(exc)
 elif uploaded is not None:
     try:
-        hist = parse.parse_price_csv(uploaded.getvalue(), uploaded.name.rsplit(".", 1)[0].upper())
+        hist = parse.parse_price_file(uploaded.getvalue(), uploaded.name)
     except MarketDataError as exc:
         error = str(exc)
 

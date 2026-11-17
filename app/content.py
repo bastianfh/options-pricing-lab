@@ -776,7 +776,7 @@ TEXT: dict[str, Entry] = {
     },
     "mk.source": {"plain": "Pick a stock", "pro": "Source"},
     "mk.source.ticker": {"plain": "Search a ticker", "pro": "Ticker"},
-    "mk.source.upload": {"plain": "Upload a file", "pro": "Upload CSV"},
+    "mk.source.upload": {"plain": "Upload a file", "pro": "Upload file"},
     "mk.ticker": {"plain": "Ticker symbol", "pro": "Ticker"},
     "mk.ticker.help": {
         "plain": "The short code a stock trades under, like AAPL for Apple. Pick one or type your own.",
@@ -784,14 +784,15 @@ TEXT: dict[str, Entry] = {
     },
     "mk.period": {"plain": "How much history", "pro": "History"},
     "mk.load": "Load",
-    "mk.upload": {"plain": "Price history (CSV)", "pro": "Price history CSV"},
+    "mk.upload": {"plain": "Price history (CSV or Excel)", "pro": "Price history (CSV / Excel)"},
     "mk.upload.help": (
-        "A CSV of daily prices with a date column and a closing-price column. Downloads from Yahoo "
-        "Finance, Nasdaq.com and Stooq work as they are. An optional Dividends column is used for the yield."
+        "Daily prices as CSV or Excel (.xlsx, .xls), with a date column and a closing-price column. "
+        "Exports from FactSet, Yahoo Finance, Nasdaq.com and Stooq work as they are: title rows above the "
+        "table are skipped and the first sheet with prices is used. An optional Dividends column is used for the yield."
     ),
     "mk.upload.sample": "Download a template CSV",
     "mk.loading": "Loading {ticker} from Yahoo Finance…",
-    "mk.empty": "Pick a ticker and press LOAD, or upload a CSV of daily prices.",
+    "mk.empty": "Pick a ticker and press LOAD, or upload a CSV or Excel file of daily prices.",
     "mk.source_note": "Source: {source}. Last close {date}. Prices are delayed and for research only.",
     "mk.snapshot": {"plain": "At a glance", "pro": "Snapshot"},
     "mk.last": {"plain": "Last price", "pro": "Last close [S]"},
