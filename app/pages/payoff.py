@@ -10,13 +10,36 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.content import t
-from app.theme import palette, show, style_figure
-from app.ui import cells, explain, input_panel, is_pro, lbl, page_header, panel, panel_title, preset_pills, section, tx, upper
-from pricing.greeks import GREEK_NAMES
-from pricing.strategies import PRESETS, Leg, from_legs, risk_summary
+from datetime import date
 
-page_header("pay.title", "pay.lede")
+from app.content import t
+from app.data import load_chain, load_expiries, load_history, load_risk_free
+from app.report import Report
+from app.theme import palette, show, style_figure
+from app.ui import (
+    Context,
+    cells,
+    explain,
+    finish_page,
+    input_panel,
+    is_pro,
+    lbl,
+    page_header,
+    panel,
+    panel_title,
+    preset_pills,
+    section,
+    tx,
+    upper,
+)
+from marketdata import fetch
+from marketdata.parse import MarketDataError, atm_implied_vol, clean_chain, leg_quote
+from pricing.greeks import GREEK_NAMES
+from pricing.historical import historical_volatility
+from pricing.strategies import PRESETS, Leg, expected_move, from_legs, probability_of_profit, risk_summary
+
+report = Report(title=t("pay.report_title"))
+actions = page_header("pay.title", "pay.lede", page="payoff", report=report)
 if not is_pro():
     preset_pills()
 
@@ -31,7 +54,33 @@ with left, panel("pay_inputs"):
         lbl("pay.strategy"), STRATEGIES, format_func=lambda k: upper(tx(f"strategy.{k}")), key="pay_strategy",
         label_visibility="collapsed", persist_state="session",
     )
-    spot_now = float(st.session_state.get("in_S", 100.0))
+    # Live market pricing is opt-in: papers usually want clean model prices.
+    st.session_state.setdefault("pay_live", False)
+    live = st.toggle(lbl("pay.live"), key="pay_live", help=tx("pay.live.help"))
+    market = None
+    if live:
+        ticker = st.session_state.get("mk_applied", ("AAPL", "2y"))[0]
+        try:
+            hist = load_history(str(ticker), "1y")
+            expiries = load_expiries(hist.label)
+        except MarketDataError as exc:
+            st.warning(str(exc))
+            expiries = []
+        if expiries:
+            target = date.fromordinal(hist.last_date.toordinal() + 30)
+            if st.session_state.get("pay_expiry") not in expiries:
+                st.session_state["pay_expiry"] = min(expiries, key=lambda e: abs((fetch.expiry_date(e) - target).days))
+            st.html(f'<p class="opl-note" style="margin:0">{html.escape(t("pay.live.ticker_note", ticker=hist.label))}</p>')
+            st.selectbox(lbl("pay.live.expiry"), expiries, key="pay_expiry")
+            rf = load_risk_free()
+            market = dict(hist=hist, expiry=st.session_state["pay_expiry"], r=rf if rf is not None else 0.04,
+                          q=hist.dividend_yield)
+            if abs(st.session_state.get("pay_center", 0) / hist.last_price - 1) > 0.5:
+                st.session_state["pay_center"] = float(round(hist.last_price))  # re-centre on the live stock
+                st.session_state["pay_width"] = float(round(hist.last_price * 0.05))
+        else:
+            st.info(t("pay.live.unavailable"))
+    spot_now = float(market["hist"].last_price) if market else float(st.session_state.get("in_S", 100.0))
     is_fx = st.session_state.get("in_asset") == "fx"
     st.session_state.setdefault("pay_center", spot_now)
     st.session_state.setdefault("pay_width", round(spot_now * 0.05, 4 if is_fx else 0))
@@ -45,8 +94,30 @@ with left, panel("pay_inputs"):
                             help=tx("pay.width.help"), persist_state="session")
     st.html('<div style="height:0.8rem"></div>')
     panel_title(tx("inputs.market"))
-    spec, _, ctx = input_panel(contract=False, numerics=False, strike=False)
-    days_total = int(st.session_state["in_days"])
+    if market:
+        hist = market["hist"]
+        exp_date = fetch.expiry_date(market["expiry"])
+        days_total = max((exp_date - hist.last_date).days, 1)
+        T_live = days_total / 365.0
+        calls, puts = load_chain(hist.label, market["expiry"])
+        chain = clean_chain(calls, puts, hist.last_price, exp_date, hist.last_date, market["r"], market["q"])
+        atm = atm_implied_vol(chain, hist.last_price)
+        if not math.isfinite(atm):
+            atm = historical_volatility(hist.window(90))
+        market.update(calls=calls, puts=puts, T=T_live, sigma=atm)
+        ctx = Context("stock", "EUR/USD", "EUR", "USD", 1e-4)
+        st.html(cells([
+            (t("pay.live.ticker"), hist.label, upper(hist.source), ""),
+            (t("pay.live.spot"), f"${hist.last_price:,.2f}", str(hist.last_date), "acc"),
+            (t("pay.live.days"), f"{days_total} D", market["expiry"], ""),
+            ("[r]", f"{market['r']:.2%}", "", ""),
+            ("[q]", f"{market['q']:.2%}", "", ""),
+            (t("pay.live.atm"), f"{atm:.1%}", "", "vol"),
+        ], columns=2))
+        spec = None
+    else:
+        spec, _, ctx = input_panel(contract=False, numerics=False, strike=False)
+        days_total = int(st.session_state["in_days"])
     st.session_state.setdefault("pay_horizon", days_total // 2)
     if st.session_state["pay_horizon"] >= days_total:
         st.session_state["pay_horizon"] = max(days_total // 2, 0)
@@ -60,10 +131,11 @@ width = float(st.session_state["pay_width"])
 if strategy_key == "custom":
     with right:
         section(tx("pay.legs.title"), t("pay.legs.custom_hint"))
+        S_ref = spot_now
         default = pd.DataFrame(
-            [{"Instrument": "call", "Quantity": 1.0, "Strike": round(spec.S * 0.95, 4)},
-             {"Instrument": "call", "Quantity": -2.0, "Strike": round(spec.S, 4)},
-             {"Instrument": "call", "Quantity": 1.0, "Strike": round(spec.S * 1.05, 4)}]
+            [{"Instrument": "call", "Quantity": 1.0, "Strike": round(S_ref * 0.95, 4)},
+             {"Instrument": "call", "Quantity": -2.0, "Strike": round(S_ref, 4)},
+             {"Instrument": "call", "Quantity": 1.0, "Strike": round(S_ref * 1.05, 4)}]
         )
         edited = st.data_editor(
             st.session_state.get("pay_custom_df", default),
@@ -92,13 +164,37 @@ if not strategy.legs:
         st.info(t("pay.legs.custom_hint"))
     st.stop()
 
+# ------------------------------------------------------------- live quotes
+quotes: dict[int, object] = {}
+if market:
+    S0, T, r, q, sigma = market["hist"].last_price, market["T"], market["r"], market["q"], market["sigma"]
+    live_legs, missing = [], []
+    for leg in strategy.legs:
+        if leg.kind == "stock":
+            live_legs.append(leg)
+            continue
+        lq = leg_quote(market["calls"], market["puts"], leg.kind, leg.strike, leg.quantity, S0, T, r, q)
+        if lq is None:
+            missing.append(leg)
+            continue
+        quotes[len(live_legs)] = lq
+        live_legs.append(Leg(leg.kind, leg.quantity, lq.strike, sigma=lq.iv if math.isfinite(lq.iv) else None,
+                             premium=lq.fill))
+    if missing:
+        with right:
+            st.warning(t("pay.live.no_quote"))
+    strategy = from_legs(strategy.name, live_legs)
+    if not strategy.legs:
+        st.stop()
+else:
+    S0, T, r, q, sigma = spec.S, spec.T, spec.r, spec.q, spec.sigma
+
 # ------------------------------------------------------------- analytics
-r, sigma, q, T = spec.r, spec.sigma, spec.q, spec.T
-cost = strategy.cost(spec.S, T, r, sigma, q)
-strikes = [leg.strike for leg in strategy.legs if leg.kind != "stock"] or [spec.S]
+cost = strategy.cost(S0, T, r, sigma, q)
+strikes = [leg.strike for leg in strategy.legs if leg.kind != "stock"] or [S0]
 sd = sigma * math.sqrt(max(T, 1 / 365))
-lo = min(spec.S * math.exp(-3.2 * sd), min(strikes) * 0.85)
-hi = max(spec.S * math.exp(3.2 * sd), max(strikes) * 1.15)
+lo = min(S0 * math.exp(-3.2 * sd), min(strikes) * 0.85)
+hi = max(S0 * math.exp(3.2 * sd), max(strikes) * 1.15)
 grid = np.linspace(lo, hi, 700)
 pnl_expiry = strategy.pnl_at_expiry(grid, cost)
 pnl_today = strategy.pnl_before_expiry(grid, T, r, sigma, cost, q)
@@ -113,15 +209,19 @@ with right:
         ml = tx("pay.unlimited") if summary.max_loss is None else ctx.money(summary.max_loss)
         be = summary.breakevens
         be_txt = " / ".join(ctx.spot(b) for b in be[:2]) if be else t("pay.none")
+        pop = probability_of_profit(strategy, cost, S0, T, r, sigma, q)
+        move = expected_move(S0, T, sigma)
         st.html(cells([
-            (cost_label, ctx.money(abs(cost)), "", "acc"),
+            (cost_label, ctx.money(abs(cost)), upper(t("pay.live.at_market")) if market else "", "acc"),
             (tx("pay.max_profit"), upper(mp), "", "pos"),
             (tx("pay.max_loss"), upper(ml), "", "neg"),
             (tx("pay.breakeven"), be_txt, "", ""),
-        ]))
+            (tx("pay.pop"), f"{pop:.0%}", upper(tx("pay.pop.sub")), ""),
+            (tx("pay.move"), f"±{ctx.money(move)}", f"±{move / S0:.1%}", "vol"),
+        ], columns=3))
         summary_txt = t(f"strategy.{strategy_key}.summary")
         if is_pro():
-            g = strategy.greeks(spec.S, T, r, sigma, q)
+            g = strategy.greeks(S0, T, r, sigma, q)
             st.html(f'<p class="opl-note">{html.escape(tx("strategy." + strategy_key))}: '
                     + ", ".join(f"{t(f'greek.{n}.short')} {v:+.4f}" for n, v in
                                  zip(GREEK_NAMES, (g.delta, g.gamma, g.vega / 100, g.theta / 365, g.rho / 100)))
@@ -148,7 +248,7 @@ with right:
         fig.add_trace(go.Scatter(x=be, y=[0] * len(be), mode="markers", name=tx("pay.breakeven"),
                                  marker=dict(color=p.accent, size=8, symbol="diamond", line=dict(color=p.canvas, width=1.5)),
                                  hovertemplate="%{x:,.4f}"))
-    fig.add_vline(x=spec.S, line=dict(color=p.accent, width=1, dash="dot"),
+    fig.add_vline(x=S0, line=dict(color=p.accent, width=1, dash="dot"),
                   annotation_text=tx("pricer.chart.spot"), annotation_position="bottom right", annotation_font_size=11)
     style_figure(fig, height=420, x_title=tx("pay.chart.x"), y_title=tx("pay.chart.y"))
     show(fig, key="pay_chart")
@@ -158,22 +258,53 @@ with right:
     with l_col:
         section(tx("pay.legs.title"))
         rows = []
-        for leg in strategy.legs:
+        for i, leg in enumerate(strategy.legs):
             side = tx("pay.leg.long") if leg.quantity > 0 else tx("pay.leg.short")
             if leg.kind == "stock":
-                inst, strike_txt, prem = tx("pay.leg.stock"), "–", spec.S
+                inst, strike_txt, prem = tx("pay.leg.stock"), "–", S0
             else:
                 inst = tx(f"in.option_type.{leg.kind}")
                 strike_txt = ctx.spot(leg.strike)
-                prem = float(Leg(leg.kind, 1, leg.strike).value(np.array(spec.S), T, r, sigma, q))
-            rows.append({t("pay.col.side"): side, t("pay.col.qty"): abs(leg.quantity),
-                         t("pay.col.instrument"): inst, t("pay.col.strike"): strike_txt,
-                         t("pay.col.premium"): ctx.money(prem)})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+                prem = leg.premium if leg.premium is not None else float(
+                    Leg(leg.kind, 1, leg.strike).value(np.array(S0), T, r, sigma, q))
+            row = {t("pay.col.side"): side, t("pay.col.qty"): abs(leg.quantity),
+                   t("pay.col.instrument"): inst, t("pay.col.strike"): strike_txt,
+                   t("pay.col.premium"): ctx.money(prem)}
+            if market:
+                lq = quotes.get(i)
+                row[t("pay.col.bid")] = ctx.money(lq.bid) if lq else "–"
+                row[t("pay.col.ask")] = ctx.money(lq.ask) if lq else "–"
+                row[t("pay.col.iv")] = f"{lq.iv:.1%}" if lq and math.isfinite(lq.iv) else "–"
+            rows.append(row)
+        legs_df = pd.DataFrame(rows)
+        st.dataframe(legs_df, hide_index=True, width="stretch")
     with g_col:
         section(tx("pay.greeks.title"))
-        g = strategy.greeks(spec.S, T, r, sigma, q)
+        g = strategy.greeks(S0, T, r, sigma, q)
         values = dict(zip(GREEK_NAMES, (g.delta, g.gamma, g.vega / 100, g.theta / 365, g.rho / 100)))
         greek_rows = [{"": tx(f"greek.{n}.name"), "Value": round(v, 4)} for n, v in values.items()]
         st.dataframe(pd.DataFrame(greek_rows), hide_index=True, width="stretch",
                      column_config={"Value": st.column_config.NumberColumn(format="%.4f")})
+
+# ------------------------------------------------------------------ report
+report.subtitle = (f"{tx('strategy.' + strategy_key)}, live quotes for {market['hist'].label} expiring {market['expiry']}"
+                   if market else f"{tx('strategy.' + strategy_key)}, model prices")
+if market:
+    report.data_source = (f"Yahoo Finance option chain for {market['hist'].label} ({market['expiry']} expiry), "
+                          f"spot as of {market['hist'].last_date}. Long legs filled at the ask, short legs at the bid.")
+report.params(t("pay.report.setup"), {
+    "Strategy": tx("strategy." + strategy_key),
+    "Pricing": "Live market quotes" if market else "Black-Scholes model",
+    "Spot": f"{S0:,.4f}", "Days to expiry": days_total, "Volatility": f"{sigma:.2%}",
+    "Risk-free rate": f"{r:.2%}", "Dividend yield / foreign rate": f"{q:.2%}",
+})
+report.metrics(t("pay.report.results"), [
+    (cost_label, ctx.money(abs(cost))), (t("pay.max_profit.pro"), mp), (t("pay.max_loss.pro"), ml),
+    (t("pay.breakeven.pro"), be_txt), (t("pay.pop.pro"), f"{pop:.0%}"), (t("pay.move.pro"), f"±{ctx.money(move)}"),
+])
+report.figure(t("pay.report.chart"), fig)
+report.table(t("pay.legs.title.pro"), legs_df)
+report.table(t("pay.greeks.title.pro"), pd.DataFrame(greek_rows))
+report.text(t("pay.report.method"), t("pay.report.method_body"))
+
+finish_page(actions)
