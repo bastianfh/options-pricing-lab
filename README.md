@@ -24,6 +24,10 @@ You set up an option (stock or currency, call or put, strike, expiry, volatility
 - **Implied volatility:** works backwards from a price to the volatility the market is assuming, and plots it as a 3D surface.
 - **Profit and loss** for common strategies like straddles, spreads and covered calls.
 
+New here? A short **guide** opens on your first visit and walks you through where everything is, highlighting each part of the screen as it goes. You can reopen it anytime with **[?] GUIDE** in the top bar.
+
+![The first-run guide highlighting the input panel](docs/images/guide.png)
+
 There's a **Plain English / Pro** switch in the top bar. Plain English explains everything in everyday words; Pro shows the proper notation and extra detail. To open the app straight in Pro mode, add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
 
 ## The app's pages
@@ -65,7 +69,7 @@ Black-Scholes gives an exact answer for simple options, so I can check the other
 
 The Validation page in the app has the full charts and tables.
 
-There are also **328 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
+There are also **330 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
 
 ## Run it on your own computer
 
