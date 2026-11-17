@@ -55,6 +55,123 @@ TEXT: dict[str, Entry] = {
     "sidebar.source": "Source code on GitHub",
     "disclaimer": "For education and research. Model prices are not trading advice.",
 
+    # ---------------------------------------------------------------- guide
+    # First-run guide. Text in [BRACKETS] is shown as an on-screen label. Lines starting
+    # with "- " become bullet points.
+    "guide.button": "Guide",
+    "guide.button.help": "Open the step-by-step guide to the app",
+    "guide.dialog_title": "Guide",
+    "guide.step_of": "Step {n:02d} / {total:02d}",
+    "guide.next": "Next",
+    "guide.back": "Back",
+    "guide.skip": "Skip guide",
+    "guide.start": "Start the guide",
+    "guide.finish": "Start exploring",
+    "guide.map.tools": "Tools",
+    "guide.map.readout": "Readout",
+    "guide.map.mode": "Mode",
+    "guide.map.guide": "Guide",
+    "guide.map.examples": "Examples",
+    "guide.map.inputs": "Your option",
+    "guide.map.value": "Price",
+    "guide.map.methods": "4 methods",
+    "guide.map.greeks": "Greeks",
+    "guide.map.chart": "Chart",
+    "guide.welcome.title": "Welcome",
+    "guide.welcome.body": (
+        "This app works out what an option is worth, four different ways, and shows you what makes "
+        "that price move.\n"
+        "This guide takes about a minute and shows you where everything is. You can leave it at any "
+        "time and reopen it from [GUIDE] in the top bar."
+    ),
+    "guide.tools.title": "The tools",
+    "guide.tools.body": (
+        "Across the top are six tools. You're on [PRICER] now.\n"
+        "- [PRICER]: price one option and see what drives it\n"
+        "- [GREEKS]: watch how the risks change with price and time\n"
+        "- [PAYOFF]: see what a strategy makes or loses\n"
+        "- [VOL SURFACE]: see how much movement the market expects\n"
+        "- [VALIDATION]: proof that the maths is right\n"
+        "- [METHODS]: how each model works"
+    ),
+    "guide.mode.title": "Plain English or Pro",
+    "guide.mode.body": (
+        "Top right. [PLAIN ENGLISH] uses everyday words, explains every result and keeps advanced "
+        "settings out of the way. [PRO] shows standard finance notation, every setting and extra "
+        "diagnostics.\n"
+        "The maths is identical in both. If you're new, stay on [PLAIN ENGLISH]."
+    ),
+    "guide.readout.title": "The live readout",
+    "guide.readout.body": (
+        "This strip shows the settings in use right now:\n"
+        "- [MODEL]: the pricing model (BSM is Black-Scholes, GK is its currency version)\n"
+        "- [r]: the interest rate\n"
+        "- [σ]: volatility, how much the price tends to move\n"
+        "- [T]: days until the option expires\n"
+        "The green [LIVE] light means every result on screen is up to date."
+    ),
+    "guide.inputs.title": {"plain": "Describe your option", "pro": "The parameter bay"},
+    "guide.inputs.body": {
+        "plain": (
+            "The panel on the left is where you set up the option: what you're trading, a call (the "
+            "right to buy) or a put (the right to sell), today's price, the agreed price, how long it "
+            "lasts and how much the price tends to move.\n"
+            "Not sure what a box means? Hover over its [?] for a short explanation. Your settings "
+            "carry across every tool."
+        ),
+        "pro": (
+            "The left bay holds the contract and market data: underlying, call or put, exercise style, "
+            "[SPOT [S]], [STRIKE [K]], [TIME [T]], [VOLATILITY [σ]], rates and yield. "
+            "[NUMERICAL SETTINGS] at the bottom controls steps, paths and grid size.\n"
+            "Every field has a [?] tooltip, and settings carry across every tool."
+        ),
+    },
+    "guide.examples.title": "Try an example",
+    "guide.examples.body": {
+        "plain": (
+            "Not sure what to type? These buttons load a ready-made situation, such as protecting "
+            "shares you own, betting on a big move, or a EUR/USD currency option."
+        ),
+        "pro": (
+            "Example scenarios (protective put, straddle, EUR/USD call, covered call) are shown in "
+            "[PLAIN ENGLISH] mode, above the parameter bay."
+        ),
+    },
+    "guide.value.title": "What it's worth",
+    "guide.value.body": (
+        "The big number is the option's price today. [CALL] or [PUT] beside it tells you which kind "
+        "it is.\n"
+        "The boxes next to it split that price up: what it would be worth if used right now, what "
+        "you're paying for the time left, and how long until it expires."
+    ),
+    "guide.methods.title": "Four ways to get the same answer",
+    "guide.methods.body": (
+        "The app prices the option four independent ways: an exact formula, a tree of possible "
+        "prices, thousands of simulated futures, and a grid solver.\n"
+        "Faded digits show exactly where a method starts to differ from the exact answer. When "
+        "four different routes land on the same number, you can trust it."
+    ),
+    "guide.greeks.title": "What moves the price",
+    "guide.greeks.body": (
+        "These five boxes are the Greeks, the standard measures of an option's risk:\n"
+        "- [Δ]: how much the option moves when the asset moves\n"
+        "- [Γ]: how quickly that sensitivity changes\n"
+        "- [ν]: how much it gains if the market expects bigger moves\n"
+        "- [Θ]: how much value it loses each day\n"
+        "- [ρ]: how it reacts to interest rates"
+    ),
+    "guide.chart.title": "The picture",
+    "guide.chart.body": (
+        "The chart shows what the option is worth at every asset price: today (the orange line) and "
+        "on the day it expires (the dashed line). Hover over it to read exact values."
+    ),
+    "guide.done.title": "You're all set",
+    "guide.done.body": (
+        "Change anything on the left and every number and chart updates instantly. Try the other "
+        "tools along the top when you're ready.\n"
+        "You can reopen this guide at any time with [GUIDE] in the top bar."
+    ),
+
     # --------------------------------------------------------------- inputs
     "inputs.contract": {"plain": "The option", "pro": "Parameters"},
     "inputs.market": {"plain": "The market", "pro": "Market data"},

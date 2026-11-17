@@ -123,17 +123,20 @@ def render_topbar(current: str) -> None:
     american = s.get("in_exercise") == "american"
     fx = s.get("in_asset") == "fx"
     model = "CRR/PDE" if american else ("GK" if fx else "BSM")
+    from app import guide  # imported here: app.guide itself imports this module
+
     with st.container(horizontal=True, key="topbar", vertical_alignment="center", gap="small"):
         st.html('<div class="opl-wordmark">OPL<b>/</b>LAB</div>')
-        st.segmented_control(
-            "Tool",
-            options=NAV_ORDER,
-            format_func=lambda k: f"[{NAV_ORDER.index(k) + 1:02d}] {upper(t(f'navshort.{k}'))}",
-            key="nav_tool",
-            required=True,
-            on_change=_on_nav,
-            label_visibility="collapsed",
-        )
+        with st.container(key="topnav", width="content"):
+            st.segmented_control(
+                "Tool",
+                options=NAV_ORDER,
+                format_func=lambda k: f"[{NAV_ORDER.index(k) + 1:02d}] {upper(t(f'navshort.{k}'))}",
+                key="nav_tool",
+                required=True,
+                on_change=_on_nav,
+                label_visibility="collapsed",
+            )
         st.html(
             '<div class="opl-telemetry">'
             f"<span>MODEL <b>{model}</b></span>"
@@ -144,16 +147,24 @@ def render_topbar(current: str) -> None:
             "</div>"
         )
         st.space("stretch")
-        st.segmented_control(
-            upper(t("mode.label")),
-            options=[PLAIN, PRO],
-            key="mode",
-            required=True,
-            on_change=_sync_mode_param,
-            help=t("mode.help"),
-            label_visibility="collapsed",
-            persist_state="session",
+        st.button(
+            f"[?] {upper(t('guide.button'))}",
+            key="guide_btn",
+            on_click=guide.start,
+            help=t("guide.button.help"),
+            type="tertiary",
         )
+        with st.container(key="topmode", width="content"):
+            st.segmented_control(
+                upper(t("mode.label")),
+                options=[PLAIN, PRO],
+                key="mode",
+                required=True,
+                on_change=_sync_mode_param,
+                help=t("mode.help"),
+                label_visibility="collapsed",
+                persist_state="session",
+            )
 
 
 def page_header(title_key: str, lede_key: str) -> None:

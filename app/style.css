@@ -243,3 +243,72 @@ a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 
   .opl-readout .v { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- first-run guide ---------- */
+[data-testid="stDialog"] [role="dialog"] {
+  background: var(--panel) !important;
+  border: 1px solid var(--rule) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+[data-testid="stDialog"] [role="dialog"] h2:first-of-type,
+[data-testid="stDialog"] [role="dialog"] > div:first-child { font-family: var(--mono); }
+.opl-guide h2 {
+  font-family: var(--sans);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0.4rem 0 0.6rem 0;
+  padding: 0;
+}
+.opl-guide-step { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--accent); margin-top: 0.7rem; }
+.opl-guide-progress { display: flex; gap: 3px; }
+.opl-guide-progress i { flex: 1; height: 3px; background: var(--well); }
+.opl-guide-progress i.on { background: var(--accent); }
+.opl-guide-body { font-family: var(--sans); font-size: 13.5px; line-height: 1.6; color: var(--ink); }
+.opl-guide-body p { margin: 0 0 0.6rem 0; }
+.opl-guide-body ul { margin: 0 0 0.6rem 0; padding: 0; list-style: none; }
+.opl-guide-body li { padding: 0.32rem 0; border-top: 1px solid var(--rule); }
+.opl-guide-body li:last-child { border-bottom: 1px solid var(--rule); }
+.opl-key {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--rule);
+  background: var(--well);
+  padding: 1px 5px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+/* Mini-map of the screen: the region being described is lit. */
+.opl-minimap {
+  display: grid;
+  gap: 3px;
+  margin: 0.9rem 0 0.2rem 0;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "tools tools readout readout guide mode"
+    "examples examples . . . ."
+    "inputs inputs value value value value"
+    "inputs inputs methods methods methods methods"
+    "inputs inputs greeks greeks greeks greeks"
+    "inputs inputs chart chart chart chart";
+}
+.opl-minimap .m {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  background: var(--canvas);
+  padding: 0.4rem 0.35rem;
+  min-height: 1.9rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.opl-minimap .m.on { color: var(--accent); border-color: var(--accent); background: rgba(255, 85, 0, 0.08); }
+.st-key-guide_buttons { margin-top: 0.4rem; }
+.st-key-guide_btn button { font-family: var(--mono) !important; font-size: 10.5px !important; letter-spacing: 0.08em; color: var(--label) !important; }
+.st-key-guide_btn button:hover { color: var(--accent) !important; }

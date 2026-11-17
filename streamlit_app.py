@@ -16,6 +16,7 @@ from __future__ import annotations
 import pandas  # noqa: F401
 import streamlit as st
 
+from app import guide
 from app.content import t
 from app.ui import handle_navigation, init_mode, init_state, inject_css, render_topbar, reset_module_index
 
@@ -37,5 +38,7 @@ handle_navigation(PAGES)
 current = next(key for key, page in PAGES.items() if page.title == navigation.title)
 inject_css()
 reset_module_index()
+guide.maybe_auto_open(current)
 render_topbar(current)
 navigation.run()
+guide.render(current)
