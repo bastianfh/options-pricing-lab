@@ -7,13 +7,25 @@ Plain/Pro toggle used to be bound to ``?mode=``, which Streamlit refuses to clea
 
 from __future__ import annotations
 
+import sys
+import types
 from pathlib import Path
 
 import pytest
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
+from tests.test_marketdata import FakeTicker
+
 APP = str(Path(__file__).resolve().parent.parent / "streamlit_app.py")
-PAGES = ["pricer", "greeks", "payoff", "surface", "validation", "methods"]
+PAGES = ["pricer", "market", "greeks", "payoff", "surface", "validation", "methods"]
+
+
+@pytest.fixture(autouse=True)
+def offline_market_data(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never call Yahoo Finance from tests: the Market page gets a fake yfinance with synthetic data."""
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+    st.cache_data.clear()
 
 
 def _start(mode: str | None) -> AppTest:
@@ -69,3 +81,28 @@ def test_guide_can_be_skipped_and_reopened() -> None:
     at.button(key="guide_btn").click().run()  # GUIDE in the top bar
     assert not at.exception, [e.message for e in at.exception]
     assert at.session_state["guide_active"] is True and at.session_state["guide_step"] == 0
+
+
+def test_market_page_sends_real_numbers_to_the_pricer() -> None:
+    at = _start(None)
+    at.session_state["_goto"] = "market"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    at.button(key="mk_send").click().run()
+    at.run()  # follow the page switch requested by the button
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["nav_tool"] == "pricer"
+    assert at.session_state["mk_sent"] == "AAPL"
+    assert at.session_state["in_asset"] == "stock" and at.session_state["in_r"] == pytest.approx(100 * 0.040420, abs=1e-3)
+
+
+def test_market_option_chain_builds_a_surface() -> None:
+    at = _start("Pro")
+    at.session_state["_goto"] = "market"
+    at.run()
+    at.button(key="mk_build_surface").click().run()
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["nav_tool"] == "surface"
+    assert at.session_state["mk_surface"]["ticker"] == "AAPL"
+    assert at.session_state["vs_source"] == "market"
