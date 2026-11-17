@@ -87,7 +87,10 @@ def build_html(report: Report) -> str:
             parts.append(f"<section><h2>{html.escape(heading)}</h2><table class='kv'>{rows}</table></section>")
         elif kind == "metrics":
             heading, values = payload
-            cells = "".join(f"<div><span>{html.escape(k)}</span><b>{html.escape(v)}</b></div>" for k, v in values)
+            def tone(v: str) -> str:  # gains green, losses red, as in the app
+                return " class='pos'" if v.startswith("+") else (" class='neg'" if v.startswith(("−", "-")) else "")
+
+            cells = "".join(f"<div><span>{html.escape(k)}</span><b{tone(v)}>{html.escape(v)}</b></div>" for k, v in values)
             parts.append(f"<section><h2>{html.escape(heading)}</h2><div class='metrics'>{cells}</div></section>")
         elif kind == "text":
             heading, body = payload
@@ -133,6 +136,8 @@ def build_html(report: Report) -> str:
   .metrics div {{ background: white; padding: .55rem .65rem; }}
   .metrics span {{ display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }}
   .metrics b {{ font: 600 15px ui-monospace, Menlo, monospace; }}
+  .metrics b.pos {{ color: #0a7f3f; }}
+  .metrics b.neg {{ color: #c62828; }}
   .note {{ color: var(--muted); font-size: 12px; }}
   footer {{ margin-top: 2.2rem; border-top: 2px solid var(--ink); padding-top: .8rem; font-size: 12.5px; }}
   footer .cite {{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f5f6f8; padding: .6rem; }}

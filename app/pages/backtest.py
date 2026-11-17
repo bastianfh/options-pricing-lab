@@ -162,17 +162,28 @@ with right:
     # --------------------------------------------------------------- summary
     section(tx("bt.summary"))
     bh = upper(t("bt.bh_short"))
+    def tone(x: float) -> str:
+        """Green for a gain, red for a loss: colour always follows the sign, never the benchmark."""
+        if x is None or not math.isfinite(x) or x == 0:
+            return ""
+        return "pos" if x > 0 else "neg"
+
+    excess = stats["total_return"] - bench["total_return"]
     summary_cells = [
         (tx("bt.total_return"), pct(stats["total_return"]), f"{bh} {pct(bench['total_return'])}",
-         "pos" if stats["total_return"] > bench["total_return"] else "neg"),
-        (tx("bt.annual_return"), pct(stats["annual_return"]), f"{bh} {pct(bench['annual_return'])}", ""),
-        (tx("bt.volatility"), pct(stats["annual_volatility"]).lstrip("+"), f"{bh} {pct(bench['annual_volatility']).lstrip('+')}", "vol"),
-        (tx("bt.sharpe"), num(stats["sharpe"]), f"{bh} {num(bench['sharpe'])}", ""),
+         tone(stats["total_return"])),
+        (tx("bt.annual_return"), pct(stats["annual_return"]), f"{bh} {pct(bench['annual_return'])}",
+         tone(stats["annual_return"])),
+        (tx("bt.excess"), f"{100 * excess:+.1f} pts".replace("-", "−"),
+         upper(t("bt.excess.ahead") if excess > 0 else t("bt.excess.behind")), tone(excess)),
+        (tx("bt.sharpe"), num(stats["sharpe"]), f"{bh} {num(bench['sharpe'])}", tone(stats["sharpe"])),
+        (tx("bt.volatility"), pct(stats["annual_volatility"]).lstrip("+"),
+         f"{bh} {pct(bench['annual_volatility']).lstrip('+')}", "vol"),
         (tx("bt.drawdown"), pct(-stats["max_drawdown"]), f"{bh} {pct(-bench['max_drawdown'])}", "neg"),
         (tx("bt.win_rate"), "–" if not result.cycles else f"{100 * result.win_rate:.0f}%",
          f"{len(result.cycles)} {upper(t('bt.cycles'))}", ""),
-        (tx("bt.premium"), f"${result.total_premium:,.2f}".replace("$-", "−$"), upper(t("bt.per_share")), "acc"),
-        (tx("bt.costs"), f"${result.total_costs:,.2f}", upper(t("bt.per_share")), ""),
+        (tx("bt.premium"), f"{'+' if result.total_premium > 0 else ''}${result.total_premium:,.2f}".replace("$-", "−$"),
+         f"{upper(t('bt.per_share'))}, {upper(t('bt.costs_sub'))} ${result.total_costs:,.2f}", tone(result.total_premium)),
     ]
     st.html(cells(summary_cells, columns=4))
     better = stats["total_return"] > bench["total_return"]
@@ -221,7 +232,15 @@ with right:
         show(fig_cy, key="bt_cycle_chart")
 
         section(tx("bt.log"))
-        st.dataframe(log, hide_index=True, width="stretch", height=280, column_config={
+        pal = palette()
+
+        def signed_colour(v: float) -> str:
+            if not isinstance(v, (int, float)) or v == 0 or not math.isfinite(v):
+                return ""
+            return f"color: {pal.positive if v > 0 else pal.negative}"
+
+        styled = log.style.map(signed_colour, subset=["premium", "payoff", "pnl"])
+        st.dataframe(styled, hide_index=True, width="stretch", height=280, column_config={
             "open": st.column_config.DateColumn(t("bt.col.open")),
             "expiry": st.column_config.DateColumn(t("bt.col.expiry")),
             "spot_open": st.column_config.NumberColumn(t("bt.col.spot_open"), format="%.2f"),
