@@ -82,7 +82,7 @@ def reset_module_index() -> None:
     st.session_state["_mod_idx"] = 0
 
 
-NAV_ORDER = ["pricer", "market", "greeks", "payoff", "surface", "validation", "methods"]
+NAV_ORDER = ["pricer", "market", "backtest", "greeks", "payoff", "surface", "validation", "methods"]
 
 
 def _on_nav() -> None:
@@ -168,13 +168,72 @@ def render_topbar(current: str) -> None:
             )
 
 
-def page_header(title_key: str, lede_key: str) -> None:
-    """Compact context line: page code and a one-line description (no hero)."""
-    st.html(
+@dataclass
+class PageActions:
+    """Handles for the Share link / Generate report controls drawn by :func:`page_header`."""
+
+    page: Optional[str]
+    report: Optional[object]
+    slot: Optional[object]
+
+
+def page_header(
+    title_key: str, lede_key: str, page: Optional[str] = None, report: Optional[object] = None
+) -> PageActions:
+    """Compact context line (page code and one-line description), with Share link and Generate report actions.
+
+    ``page`` enables the share link for that tool; ``report`` (an :class:`app.report.Report`) enables
+    the report download, built only when the button is clicked. Call :func:`finish_page` at the end of
+    the page so the link includes every setting the page established while it ran.
+    """
+    context_html = (
         '<div class="opl-context">'
         f"<b>{html.escape(upper(tx(title_key)))}</b>"
         f'<span class="lede">{html.escape(tx(lede_key))}</span></div>'
     )
+    if page is None and report is None:
+        st.html(context_html)
+        return PageActions(None, None, None)
+    from app.share import share_url  # local import: app.share imports app.content only
+
+    slot = None
+    with st.container(horizontal=True, vertical_alignment="center", gap="small", key="page_actions"):
+        st.html(context_html)
+        st.space("stretch")
+        if page:
+            with st.popover(f"[↗] {upper(t('share.button'))}", help=t("share.help")):
+                st.html(f'<p class="opl-note" style="margin:0 0 .5rem 0">{html.escape(t("share.caption"))}</p>')
+                slot = st.empty()
+                link = share_url(page)  # provisional; finish_page() replaces it with the complete link
+                slot.code(link, language=None, wrap_lines=True)
+                if report is not None:
+                    report.share_link = link
+        if report is not None:
+            from app.report import build_html
+
+            slug = "".join(ch if ch.isalnum() else "-" for ch in report.title.lower()).strip("-")
+            st.download_button(
+                f"[↓] {upper(t('report.button'))}",
+                data=lambda: build_html(report),
+                file_name=f"opl-{slug}.html",
+                mime="text/html",
+                help=t("report.help"),
+                key="report_download",
+                on_click="ignore",
+            )
+    return PageActions(page, report, slot)
+
+
+def finish_page(actions: PageActions) -> None:
+    """Refresh the share link (and the report's copy of it) with every setting known at the end of the run."""
+    if not actions.page or actions.slot is None:
+        return
+    from app.share import share_url
+
+    link = share_url(actions.page)
+    actions.slot.code(link, language=None, wrap_lines=True)
+    if actions.report is not None:
+        actions.report.share_link = link
 
 
 def section(title: str, lede: Optional[str] = None) -> None:

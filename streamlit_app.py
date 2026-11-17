@@ -18,6 +18,7 @@ import streamlit as st
 
 from app import guide
 from app.content import t
+from app.share import apply_shared_settings
 from app.ui import handle_navigation, init_mode, init_state, inject_css, render_topbar, reset_module_index
 
 st.set_page_config(page_title=t("app.name"), layout="wide", initial_sidebar_state="collapsed")
@@ -25,6 +26,7 @@ st.set_page_config(page_title=t("app.name"), layout="wide", initial_sidebar_stat
 PAGES = {
     "pricer": st.Page("app/pages/pricer.py", title=t("nav.pricer"), default=True),
     "market": st.Page("app/pages/market.py", title=t("nav.market"), url_path="market"),
+    "backtest": st.Page("app/pages/backtest.py", title=t("nav.backtest"), url_path="backtest"),
     "greeks": st.Page("app/pages/greeks.py", title=t("nav.greeks"), url_path="greeks"),
     "payoff": st.Page("app/pages/payoff.py", title=t("nav.payoff"), url_path="payoff"),
     "surface": st.Page("app/pages/surface.py", title=t("nav.surface"), url_path="surface"),
@@ -34,6 +36,7 @@ PAGES = {
 
 init_state()
 init_mode()
+apply_shared_settings()  # a shared link's settings override the defaults, once per session
 navigation = st.navigation(list(PAGES.values()), position="hidden")
 handle_navigation(PAGES)
 current = next(key for key, page in PAGES.items() if page.title == navigation.title)
