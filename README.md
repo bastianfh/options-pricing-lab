@@ -38,6 +38,7 @@ The look is a dark trading terminal crossed with hardware-style panels: monospac
 | Page | What's on it |
 |---|---|
 | **Pricer** | The starting page: price, all four methods side by side, the Greeks, and example scenarios |
+| **Market** | Load any real US stock (or upload a CSV): price history, volatility, return stats, the live option chain, and a button that sends its real numbers to the pricer |
 | **Greeks explorer** | Charts of how each Greek changes with the stock price and time |
 | **Payoff & P&L** | What a strategy makes or loses at expiry and before |
 | **Volatility surface** | 3D implied volatility surface and smile charts |
@@ -55,6 +56,20 @@ The look is a dark trading terminal crossed with hardware-style panels: monospac
 </tr>
 </table>
 
+## Real stock data
+
+The **Market** tool turns the lab into an investment analysis workspace for real US stocks:
+
+- **Pick a ticker** (AAPL, MSFT, SPY, anything Yahoo Finance lists) or **upload a CSV** of daily prices. Downloads from Yahoo Finance, Nasdaq.com and Stooq work as they are.
+- **Snapshot:** last close, day change, 52-week range, trailing dividend yield, historical volatility over 30 days, 90 days and 1 year, and the current 13-week T-bill rate as the risk-free rate.
+- **Analysis:** price with 50/200-day averages, rolling volatility, and the distribution of daily returns against a normal curve, with annual return, volatility, Sharpe ratio, max drawdown, skew and fat tails (excess kurtosis).
+- **Option chain:** live quotes for any expiry, turned back into implied volatility by the lab's own solver and checked against Yahoo's figures. One click builds the stock's real volatility surface.
+- **Send to the pricer:** fills the lab with the stock's real price, volatility, dividend yield and interest rate, so every other tool works on that stock.
+
+![Market data for AAPL](docs/images/market-pro-dark.png)
+
+Live data comes from Yahoo Finance through the `yfinance` package: it's free but unofficial, delayed, and meant for personal research. If it's unavailable, upload a CSV instead. The tests use a fake data source, so they never depend on the internet.
+
 ## How I know the numbers are right
 
 Black-Scholes gives an exact answer for simple options, so I can check the other three methods against it. Give each method more computing power (more steps, more simulations, a finer grid) and its error should shrink at a speed the theory predicts:
@@ -69,7 +84,7 @@ Black-Scholes gives an exact answer for simple options, so I can check the other
 
 The Validation page in the app has the full charts and tables.
 
-There are also **330 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
+There are also **369 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
 
 ## Run it on your own computer
 
@@ -110,7 +125,8 @@ pytest
 ## How the code is organised
 
 ```
-pricing/            the maths: all four pricing methods, Greeks, implied volatility
+pricing/            the maths: all four pricing methods, Greeks, implied volatility, price statistics
+marketdata/         gets real stock data in (Yahoo Finance or a CSV) and tidies it
 app/                the website: pages, styling, and all the text (content.py)
 tests/              automated tests
 docs/               detailed write-up of the maths (methods.md) and screenshots
