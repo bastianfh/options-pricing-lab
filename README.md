@@ -39,6 +39,7 @@ The look is a dark trading terminal crossed with hardware-style panels: monospac
 |---|---|
 | **Pricer** | The starting page: price, all four methods side by side, the Greeks, and example scenarios |
 | **Market** | Load any real US stock (or upload a CSV): price history, volatility, return stats, the live option chain, and a button that sends its real numbers to the pricer |
+| **Backtest** | Replay an option strategy (covered call, collar, iron condor…) on a stock's real history and compare it with buy-and-hold |
 | **Greeks explorer** | Charts of how each Greek changes with the stock price and time |
 | **Payoff & P&L** | What a strategy makes or loses at expiry and before |
 | **Volatility surface** | 3D implied volatility surface and smile charts |
@@ -70,6 +71,20 @@ The **Market** tool turns the lab into an investment analysis workspace for real
 
 Live data comes from Yahoo Finance through the `yfinance` package: it's free but unofficial, delayed, and meant for personal research. If it's unavailable, upload a CSV instead. The tests use a fake data source, so they never depend on the internet.
 
+## For class projects: backtests, reports and share links
+
+**Backtest a strategy.** Pick a stock, a strategy (covered call, protective put, collar, cash-secured put, straddle, strangle, bull/bear spreads, iron condor) and how often to roll it. The app replays it over up to 10 years of real prices and shows the equity curve against buy-and-hold, drawdowns, profit or loss per cycle, a full trade log, and return, volatility, Sharpe ratio, max drawdown and win rate. Costs (bid-ask spread and commission) and a volatility premium are adjustable.
+
+One thing to state in a paper: free historical option prices don't exist, so the backtest prices each option with Black-Scholes using the stock's recent realised volatility. The app says this on the page and in every report.
+
+![Backtest of a covered call](docs/images/backtest-pro-dark.png)
+
+**Optional: real market prices.** On the Payoff page, *Price from live option chain* (off by default) builds the strategy from today's real quotes for the stock loaded in Market: buying at the ask, selling at the bid, each option with its own implied volatility. Every strategy also shows its probability of profit and the market's expected move.
+
+**Generate report.** On the Pricer, Market, Backtest, Payoff and Validation pages, *Generate report* downloads a self-contained report with your inputs, results, charts, trade log, method and limitations, data source and a ready-made citation. Open it in any browser and use *Print → Save as PDF* for a clean PDF. It works offline.
+
+**Share link.** *Share link* gives a URL that reopens the tool with exactly your settings (ticker, dates, strategy, assumptions), so a teacher or classmate can check or reproduce a result.
+
 ## How I know the numbers are right
 
 Black-Scholes gives an exact answer for simple options, so I can check the other three methods against it. Give each method more computing power (more steps, more simulations, a finer grid) and its error should shrink at a speed the theory predicts:
@@ -84,7 +99,7 @@ Black-Scholes gives an exact answer for simple options, so I can check the other
 
 The Validation page in the app has the full charts and tables.
 
-There are also **369 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
+There are also **420 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
 
 ## Run it on your own computer
 
@@ -125,7 +140,7 @@ pytest
 ## How the code is organised
 
 ```
-pricing/            the maths: all four pricing methods, Greeks, implied volatility, price statistics
+pricing/            the maths: all four pricing methods, Greeks, implied volatility, price statistics, backtests
 marketdata/         gets real stock data in (Yahoo Finance or a CSV) and tidies it
 app/                the website: pages, styling, and all the text (content.py)
 tests/              automated tests

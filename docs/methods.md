@@ -159,6 +159,21 @@ prices. This is an illustration, not an arbitrage-free parameterisation such as 
 expiry and σ; recovered σ to relative $10^{-5}$; bisection fallback exercised from a
 deliberately bad start; full surface recovery to $10^{-7}$ wherever the price exceeds $10^{-8}$.
 
+## 7. Strategy backtests
+
+`pricing/backtest.py` replays a rolling option strategy on a real daily price series.
+
+* **Capital and positions.** Start with one share's price in capital. Strategies that hold stock keep one share throughout; the rest is cash earning the risk-free rate $r$ (accrued over calendar days). Dividends are paid in cash on shares held.
+* **Rolls.** On each roll date, option legs are opened with strikes $K = m \cdot S_t$ (optionally rounded to a strike increment) and expiry on the first trading day at least `tenor_days` later. They are held to expiry, settled at intrinsic value, and replaced.
+* **Pricing.** Historical option quotes are not freely available, so options are priced with Black-Scholes-Merton using trailing realised volatility over a window of $w$ trading days, scaled by a volatility premium $\pi$: $\sigma_t = \max(\hat\sigma_{t,w}(1 + \pi), \sigma_{\min})$. Each cycle's daily marks are computed in one vectorised call.
+* **Costs.** Half of a proportional bid-ask spread $s$ is paid on each option opened, plus a commission per contract.
+* **Benchmark.** One share bought at the start, with dividends kept in cash at the same rate.
+* **Metrics.** Total and annualised return (calendar span), annualised volatility of daily log returns, Sharpe ratio $(\bar r_{\text{ann}} - r)/\sigma_{\text{ann}}$, maximum drawdown, and win rate (share of cycles in which portfolio value rose).
+
+**Validation.** A conversion (long stock, long put, short call at the same strike) is riskless by put-call parity. The test checks that, while hedged, the backtested portfolio grows at exactly $r$ (daily log growth equal to $r\,\Delta t$ to $10^{-10}$), whatever the stock does. Further tests check that buy-and-hold matches the benchmark exactly, that a far out-of-the-money covered call is indistinguishable from holding the stock, that costs always reduce performance, and that every short call settles at $-\max(S_T - K, 0)$.
+
+**Limitations to state in a write-up.** Model prices instead of quotes (no volatility smile, no earnings premia), no early exercise or assignment risk, no margin or taxes, and a constant risk-free rate.
+
 ## References
 
 - Black, F. & Scholes, M. (1973). The pricing of options and corporate liabilities. *JPE* 81(3).
