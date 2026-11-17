@@ -29,7 +29,8 @@ import numpy as np
 import pandas as pd
 
 from pricing.historical import trailing_dividend_yield
-from pricing.implied_vol import implied_volatility
+from pricing.implied_vol import VolSurface, implied_volatility, otm_option_types
+from pricing.models.black_scholes import black_scholes_price
 
 MIN_ROWS = 30
 
@@ -271,3 +272,43 @@ def quotes_for_surface(chains: list[pd.DataFrame]) -> pd.DataFrame:
     if not frames:
         return pd.DataFrame(columns=["strike", "expiry", "price", "type"])
     return pd.concat(frames, ignore_index=True)
+
+
+def surface_from_chains(
+    quotes: pd.DataFrame,
+    spot: float,
+    r: float,
+    q: float,
+    moneyness: tuple[float, float] = (0.8, 1.2),
+    n_strikes: int = 25,
+) -> VolSurface:
+    """Interpolate market implied vols onto a common strike grid, one row per expiry.
+
+    Listed strikes differ between expiries, so each expiry's smile (its ``iv`` by
+    ``strike``) is interpolated linearly onto ``spot * linspace(*moneyness)``. Points
+    outside the strikes actually quoted for that expiry are left as ``nan`` rather than
+    extrapolated. Prices on the grid are the Black-Scholes prices at those vols, using
+    the out-of-the-money option at each point.
+    """
+    strikes = spot * np.linspace(moneyness[0], moneyness[1], n_strikes)
+    q_ = quotes.dropna(subset=["iv"])
+    expiries = np.sort(q_["years"].unique()) if len(q_) else np.empty(0)
+    vols = np.full((len(expiries), len(strikes)), np.nan)
+    for i, T in enumerate(expiries):
+        smile = q_[q_["years"] == T].sort_values("strike")
+        if len(smile) < 2:
+            continue
+        k, v = smile["strike"].to_numpy(float), smile["iv"].to_numpy(float)
+        inside = (strikes >= k.min()) & (strikes <= k.max())
+        vols[i, inside] = np.interp(strikes[inside], k, v)
+    keep = np.isfinite(vols).any(axis=1)
+    expiries, vols = expiries[keep], vols[keep]
+    types = otm_option_types(strikes, expiries, spot, r, q)
+    prices = np.full(vols.shape, np.nan)
+    for i, T in enumerate(expiries):
+        ok = np.isfinite(vols[i])
+        for kind in ("call", "put"):
+            m = ok & (types[i] == kind)
+            if m.any():
+                prices[i, m] = black_scholes_price(spot, strikes[m], T, r, vols[i, m], q, kind)
+    return VolSurface(strikes, expiries, vols, prices, types)

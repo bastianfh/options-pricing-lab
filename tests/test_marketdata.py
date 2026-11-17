@@ -19,6 +19,7 @@ from marketdata.parse import (
     history_from_frame,
     parse_price_csv,
     quotes_for_surface,
+    surface_from_chains,
 )
 from pricing.models.black_scholes import black_scholes_price
 
@@ -127,6 +128,22 @@ def test_expired_chain_is_empty_and_quotes_table_shape() -> None:
     ch = clean_chain(calls, puts, 100.0, date(2026, 3, 1), date(2026, 1, 1), 0.0, 0.0)
     table = quotes_for_surface([ch, ch.iloc[0:0]])
     assert list(table.columns) == ["strike", "expiry", "price", "type"] and len(table) == len(ch)
+
+
+def test_surface_from_chains_interpolates_within_quoted_strikes_only() -> None:
+    today = date(2026, 11, 16)
+    chains = []
+    for days, sigma in ((30, 0.30), (90, 0.25)):
+        calls, puts = synthetic_chain(100.0, sigma, days / 365, 0.03, 0.0)
+        chains.append(clean_chain(calls, puts, 100.0, today + timedelta(days=days), today, 0.03, 0.0))
+    quotes = pd.concat(chains)
+    surface = surface_from_chains(quotes[quotes["strike"] <= 115], 100.0, 0.03, 0.0)
+    assert surface.vols.shape == (2, 25)
+    np.testing.assert_allclose(surface.expiries, [30 / 365, 90 / 365])
+    quoted = surface.strikes <= 115
+    np.testing.assert_allclose(surface.vols[0, quoted], 0.30, rtol=1e-5)  # flat smile recovered
+    assert np.isnan(surface.vols[:, ~quoted]).all()                        # no extrapolation past 115
+    assert np.isfinite(surface.prices[:, quoted]).all()
 
 
 # --------------------------------------------------------------------------- fetching (fake yfinance)
