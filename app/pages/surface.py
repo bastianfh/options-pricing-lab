@@ -19,6 +19,7 @@ from app.ui import (
     cells,
     context,
     explain,
+    finish_page,
     init_state,
     is_pro,
     lbl,
@@ -39,7 +40,7 @@ from pricing.implied_vol import (
     synthetic_vol,
 )
 
-page_header("vs.title", "vs.lede")
+actions = page_header("vs.title", "vs.lede", page="surface")
 init_state()
 
 left, right = st.columns([1, 2.3], gap="large")
@@ -227,3 +228,5 @@ with right:
                 (t("vs.diag.iters"), f"{diag['mean_iters']:.1f}", "", ""),
             ]))
         st.html(f'<p class="opl-note">{html.escape(tx("vs.insight"))}</p>')
+
+finish_page(actions)

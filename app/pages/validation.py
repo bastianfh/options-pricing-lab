@@ -11,8 +11,9 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.content import t
+from app.report import Report
 from app.theme import DASHES, MARKERS, palette, show, style_figure
-from app.ui import cached, cells, count_tests, explain, is_pro, lbl, page_header, section, tx, upper
+from app.ui import cached, cells, count_tests, explain, finish_page, is_pro, lbl, page_header, section, tx, upper
 from pricing.convergence import (
     MC_VARIANTS,
     binomial_study,
@@ -27,7 +28,8 @@ from pricing.models.binomial import binomial_price
 from pricing.models.black_scholes import black_scholes_price
 from pricing.models.finite_difference import finite_difference_price
 
-page_header("val.title", "val.lede")
+report = Report(title=t("val.report_title"))
+actions = page_header("val.title", "val.lede", page="validation", report=report)
 
 CASES = {
     "atm": dict(S=100.0, K=100.0),
@@ -188,6 +190,7 @@ fig.update_xaxes(type="log", dtick=1)
 fig.update_yaxes(type="log", exponentformat="power", dtick=1)
 style_figure(fig, height=400, x_title=tx("val.work.x"), y_title=tx("val.work.y"), hovermode="closest")
 show(fig, key="val_work")
+report.figure(t("val.work.title", "Pro"), fig)
 
 # --------------------------------------------------------------- binomial
 section(tx("val.bin.title"), tx("val.bin.lede"))
@@ -203,6 +206,7 @@ with b1:
                                  hovertemplate="N=%{x}: %{y:.6f}"))
     style_figure(fig, height=330, x_title=tx("val.bin.x"), y_title=tx("val.price_y"))
     show(fig, key="val_bin_price")
+    report.figure(t("val.bin.title", "Pro") + ": price vs steps", fig)
 with b2:
     err = np.abs(bin_dense.errors)
     fig = go.Figure()
@@ -216,6 +220,7 @@ with b2:
     fig.update_yaxes(type="log", exponentformat="power", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.bin.x"), y_title=tx("val.error_y"), hovermode="closest")
     show(fig, key="val_bin_err")
+    report.figure(t("val.bin.title", "Pro") + ": error", fig)
 bin_table = pd.DataFrame({
     "N": BIN_DENSE, t("table.price"): bin_dense.prices, t("table.error"): bin_dense.errors,
     t("table.n_error"): BIN_DENSE * np.abs(bin_dense.errors), t("table.runtime"): bin_dense.runtime_ms,
@@ -248,6 +253,7 @@ with m1:
     fig.update_xaxes(type="log", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.mc.x"), y_title=tx("val.mc.price_y"), hovermode="closest")
     show(fig, key="val_mc_price")
+    report.figure(t("val.mc.title", "Pro") + ": estimates", fig)
 with m2:
     fig = go.Figure()
     for i, (key, study) in enumerate(mc.studies.items()):
@@ -261,6 +267,7 @@ with m2:
     fig.update_yaxes(type="log", exponentformat="power", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.mc.x"), y_title=tx("val.mc.se_y"), hovermode="x unified")
     show(fig, key="val_mc_se")
+    report.figure(t("val.mc.title", "Pro") + ": standard error", fig)
 mc_rows = []
 for key, study in mc.studies.items():
     vrf = mc.variance_reduction_factor(key)
@@ -294,6 +301,7 @@ with d1:
     fig.update_yaxes(type="log", exponentformat="power", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.pde.x"), y_title=tx("val.error_y"), hovermode="closest")
     show(fig, key="val_pde")
+    report.figure(t("val.pde.title", "Pro"), fig)
 with d2:
     ratios = ["–"] + [f"{a / b:.2f}" for a, b in zip(np.abs(pde.errors[:-1]), np.abs(pde.errors[1:]))]
     st.dataframe(pd.DataFrame({
@@ -324,6 +332,7 @@ with a1:
     fig.update_xaxes(type="log", dtick=1)
     style_figure(fig, height=330, x_title=tx("val.am.x"), y_title=tx("val.price_y"), hovermode="closest")
     show(fig, key="val_am")
+    report.figure(t("val.am.title", "Pro"), fig)
 with a2:
     st.dataframe(pd.DataFrame(am_rows, columns=[
         "S", t("method.short.binomial"), t("method.short.finite_difference"), "|Δ|", tx("val.am.premium"),
@@ -373,3 +382,19 @@ with q2:
         ], columns=2))
 
 st.html(f'<p class="opl-note" style="margin-top:1.6rem">{html.escape(tx("val.tests", n=count_tests()))}</p>')
+
+# ------------------------------------------------------------------ report
+report.subtitle = f"{CASE_LABELS[case]['Pro']}, {spec.option_type.value}; Black-Scholes = {bs:.6f}"
+report.params(t("val.report.case"), {"S": spec.S, "K": spec.K, "T": spec.T, "r": spec.r, "sigma": spec.sigma,
+                                     "q": spec.q, "Type": spec.option_type.value, "Black-Scholes price": round(bs, 6)})
+report.table(t("val.report.orders"), pd.DataFrame([
+    {"Method": t(f"method.{m}", "Pro"), "Resolution": res, "Theoretical order": expected,
+     "Measured order": round(measured, 3), "Error at finest": f"{final:.2e}"}
+    for m, (measured, expected, tol, final, res) in orders.items()
+]))
+report.table(t("val.report.mc"), pd.DataFrame(mc_rows))
+report.table(t("val.report.pde"), pd.DataFrame({"M = N": PDE_GRIDS, "Price": pde.prices, "Error": pde.errors}))
+report.table(t("val.report.greeks"), pd.DataFrame(rows))
+report.text(t("val.report.method"), t("val.report.method_body"))
+
+finish_page(actions)

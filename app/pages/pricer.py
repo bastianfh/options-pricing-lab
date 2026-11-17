@@ -11,12 +11,14 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from app.content import t
+from app.report import Report
 from app.theme import palette, show, style_figure
 from app.ui import (
     Context,
     agreement_html,
     cached,
     explain,
+    finish_page,
     input_panel,
     is_pro,
     page_header,
@@ -33,7 +35,8 @@ from pricing.greeks import GREEK_NAMES
 from pricing.models.black_scholes import black_scholes_price, d1_d2
 from pricing.utils import ExerciseStyle, OptionType
 
-page_header("pricer.title", "pricer.lede")
+report = Report(title=t("pricer.report_title"))
+actions = page_header("pricer.title", "pricer.lede", page="pricer", report=report)
 
 if not is_pro():
     preset_pills()
@@ -276,3 +279,31 @@ with right:
                   annotation_font=dict(size=10, color=p.label))
     style_figure(fig, height=330, x_title=tx("pricer.chart.x"), y_title=tx("pricer.chart.y"))
     show(fig, key="pricer_value_chart")
+
+# ------------------------------------------------------------------ report
+report.subtitle = f"{spec.option_type.value.title()}, {spec.exercise.value}, {ctx.pair if ctx.is_fx else 'equity'}"
+report.params(t("pricer.report.setup"), {
+    "Underlying": ctx.pair if ctx.is_fx else "Equity / index",
+    "Option": f"{spec.exercise.value.title()} {spec.option_type.value}",
+    "Spot S": spec.S, "Strike K": spec.K, "Time to expiry T (years)": round(spec.T, 6),
+    "Volatility": f"{spec.sigma:.2%}", "Risk-free rate r": f"{spec.r:.2%}",
+    ("Foreign rate" if ctx.is_fx else "Dividend yield") + " q": f"{spec.q:.2%}",
+    "Binomial steps": settings.binomial_steps, "Monte Carlo paths": f"{settings.mc_paths:,}",
+    "PDE grid": f"{settings.pde_space_steps} x {settings.pde_time_steps}",
+})
+report.metrics(t("pricer.report.price"), [
+    (t(f"method.{m.value}", "Pro"), "n/a" if not res.available else f"{res.price:.6f}")
+    for m, res in results.items()
+] + [("Monte Carlo 95% CI", "n/a" if not results[Method.MONTE_CARLO].available else
+      f"[{results[Method.MONTE_CARLO].ci_low:.4f}, {results[Method.MONTE_CARLO].ci_high:.4f}]")])
+greek_table = pd.DataFrame([
+    {"Greek": t(f"greek.{n}.name", "Pro"), "Units": t(f"greek.{n}.unit"),
+     **{t(f"method.short.{m.value}"): (greek_display(n, getattr(gks[m], n)) if gks[m] is not None else float("nan"))
+        for m in Method}}
+    for n in GREEK_NAMES
+])
+report.table(t("pricer.report.greeks"), greek_table)
+report.figure(t("pricer.chart.title", "Pro"), fig)
+report.text(t("pricer.report.method"), t("pricer.report.method_body"))
+
+finish_page(actions)

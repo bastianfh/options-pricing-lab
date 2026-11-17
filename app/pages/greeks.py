@@ -10,10 +10,10 @@ import streamlit as st
 
 from app.content import t
 from app.theme import DASHES, colorscale, diverging_scale, palette, show, style_figure
-from app.ui import explain, input_panel, is_pro, lbl, page_header, panel, panel_title, section, tx, upper
+from app.ui import explain, finish_page, input_panel, is_pro, lbl, page_header, panel, panel_title, section, tx, upper
 from pricing.greeks import GREEK_NAMES, black_scholes_greeks
 
-page_header("gx.title", "gx.lede")
+actions = page_header("gx.title", "gx.lede", page="greeks")
 
 left, right = st.columns([1, 2.3], gap="large")
 with left, panel("gx_inputs"):
@@ -117,3 +117,5 @@ with right:
     fig.add_vline(x=spec.K, line=dict(color=p.label, width=1, dash="dash"))
     style_figure(fig, height=360, x_title=tx("gx.x_spot"), y_title=tx("gx.x_time"), legend=False, hovermode="closest")
     show(fig, key="gx_heat")
+
+finish_page(actions)

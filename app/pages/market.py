@@ -13,39 +13,17 @@ import streamlit as st
 from scipy.stats import norm
 
 from app.content import t
+from app.report import Report
 from app.theme import palette, show, style_figure
-from app.ui import apply_values, cells, explain, is_pro, lbl, page_header, panel, panel_title, section, tx, upper
+from app.ui import apply_values, cells, explain, finish_page, is_pro, lbl, page_header, panel, panel_title, section, tx, upper
+from app.data import FALLBACK_RATE, POPULAR, load_chain, load_expiries, load_history, load_risk_free
 from marketdata import fetch, parse
 from marketdata.parse import MarketDataError, PriceHistory
 from pricing.historical import historical_volatility, log_returns, rolling_volatility, summarize
 
-POPULAR = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM", "V", "JNJ", "XOM", "KO", "SPY", "QQQ"]
 PERIOD_KEYS = ["6mo", "1y", "2y", "5y"]
 DEFAULT = ("AAPL", "2y")
 HV_WINDOWS = {"30D": 30, "90D": 90, "1Y": 365}
-FALLBACK_RATE = 0.04
-
-
-# --------------------------------------------------------------------------- cached loaders
-
-@st.cache_data(ttl=900, show_spinner=False, max_entries=32)
-def load_history(ticker: str, period: str) -> PriceHistory:
-    return fetch.fetch_history(ticker, period)
-
-
-@st.cache_data(ttl=900, show_spinner=False, max_entries=32)
-def load_expiries(ticker: str) -> list[str]:
-    return fetch.fetch_expiries(ticker)
-
-
-@st.cache_data(ttl=600, show_spinner=False, max_entries=64)
-def load_chain(ticker: str, expiry: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    return fetch.fetch_chain(ticker, expiry)
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def load_risk_free() -> float | None:
-    return fetch.fetch_risk_free()
 
 
 def _on_load() -> None:
@@ -75,7 +53,8 @@ def _hv(hist: PriceHistory, days: int) -> float:
 
 # --------------------------------------------------------------------------- layout
 
-page_header("mk.title", "mk.lede")
+report = Report(title=t("mk.report_title"))
+actions = page_header("mk.title", "mk.lede", page="market", report=report)
 st.session_state.setdefault("mk_ticker", DEFAULT[0])
 st.session_state.setdefault("mk_period", DEFAULT[1])
 st.session_state.setdefault("mk_applied", DEFAULT)
@@ -180,6 +159,14 @@ with right:
             except MarketDataError as exc:
                 st.warning(str(exc))
     atm_iv = parse.atm_implied_vol(chain, hist.last_price) if len(chain) else float("nan")
+    report.subtitle = f"{hist.label}, {len(hist.dates)} trading days to {hist.last_date}"
+    report.data_source = f"{hist.source}, daily prices and dividends for {hist.label} up to {hist.last_date}."
+    report.metrics(t("mk.snapshot", "Pro"), [
+        (t("mk.last", "Pro"), _money(hist.last_price)), (t("mk.range"), f"{_money(last_year.min())} - {_money(last_year.max())}"),
+        (t("mk.yield", "Pro"), _pct(q, 2)), (t("mk.rf", "Pro"), _pct(rate, 2) if rate is not None else "n/a"),
+        (t("mk.hv", "Pro", w="30D"), _pct(hv["30D"])), (t("mk.hv", "Pro", w="90D"), _pct(hv["90D"])),
+        (t("mk.hv", "Pro", w="1Y"), _pct(hv["1Y"])), ("ATM implied vol", _pct(atm_iv) if math.isfinite(atm_iv) else "n/a"),
+    ])
 
     # -------------------------------------------------------- send to the lab
     section(tx("mk.send.title"), tx("mk.send.lede"))
@@ -212,6 +199,8 @@ with right:
                                      line=dict(color=color, width=1.2, dash=dash), hovertemplate="%{y:,.2f}"))
     style_figure(fig, height=330, y_title=tx("mk.history.y"))
     show(fig, key="mk_history_chart")
+    report.figure(t("mk.history.title", "Pro"), fig)
+
 
     # ------------------------------------------------------------- volatility
     section(tx("mk.vol.title"), tx("mk.vol.lede"))
@@ -227,6 +216,8 @@ with right:
                       annotation_font=dict(size=10, color=p.accent))
     style_figure(fig, height=300, y_title=tx("mk.vol.y"))
     show(fig, key="mk_vol_chart")
+    report.figure(t("mk.vol.title", "Pro"), fig)
+
 
     # ------------------------------------------------------------- returns
     section(tx("mk.returns.title"), tx("mk.returns.lede"))
@@ -245,6 +236,8 @@ with right:
         fig.update_layout(bargap=0.04)
         style_figure(fig, height=300, x_title=tx("mk.returns.x"), y_title=tx("mk.returns.y"), hovermode="closest")
         show(fig, key="mk_returns_chart")
+        report.figure(t("mk.returns.title", "Pro"), fig)
+
     with c2:
         st.html(cells([
             (tx("mk.stat.return"), _pct(summary.annual_return), "", "pos" if summary.annual_return > 0 else "neg"),
@@ -256,6 +249,12 @@ with right:
             (tx("mk.stat.worst"), _pct(summary.worst_day), "", "neg"),
             (tx("mk.stat.best"), _pct(summary.best_day), "", "pos"),
         ], columns=2))
+    report.metrics(t("mk.returns.title", "Pro"), [
+        (t("mk.stat.return", "Pro"), _pct(summary.annual_return)), (t("mk.stat.vol", "Pro"), _pct(summary.annual_volatility)),
+        (t("mk.stat.sharpe", "Pro"), f"{summary.sharpe:.2f}"), (t("mk.stat.drawdown", "Pro"), _pct(-summary.max_drawdown)),
+        (t("mk.stat.skew", "Pro"), f"{summary.skewness:+.2f}"), (t("mk.stat.kurt", "Pro"), f"{summary.excess_kurtosis:+.2f}"),
+        (t("mk.stat.worst", "Pro"), _pct(summary.worst_day)), (t("mk.stat.best", "Pro"), _pct(summary.best_day)),
+    ])
 
     # ------------------------------------------------------------- option chain
     section(tx("mk.chain.title"), tx("mk.chain.lede"))
@@ -285,6 +284,8 @@ with right:
                       annotation_text="S", annotation_font=dict(size=10, color=p.accent))
         style_figure(fig, height=320, x_title=tx("mk.chain.x"), y_title=tx("mk.chain.y"), hovermode="closest")
         show(fig, key="mk_chain_chart")
+        report.figure(t("mk.chain.title", "Pro") + f" ({expiry})", fig)
+
 
         table = chain.assign(iv=chain["iv"] * 100, yahoo_iv=chain["yahoo_iv"] * 100)[
             ["type", "strike", "bid", "ask", "price", "iv", "yahoo_iv", "volume", "open_interest"]
@@ -300,6 +301,7 @@ with right:
             "volume": st.column_config.NumberColumn(t("mk.col.volume"), format="%d"),
             "open_interest": st.column_config.NumberColumn(t("mk.col.oi"), format="%d"),
         })
+        report.table(t("mk.chain.title", "Pro") + f" ({expiry})", table)
 
     if build:
         horizon = [e for e in expiries if 7 <= (fetch.expiry_date(e) - hist.last_date).days <= 400]
@@ -321,3 +323,5 @@ with right:
             )
             st.session_state["_goto"] = "surface"
             st.rerun()
+
+finish_page(actions)

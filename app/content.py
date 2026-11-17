@@ -46,6 +46,8 @@ TEXT: dict[str, Entry] = {
     "nav.validation": "Validation",
     "nav.methods": "Methods",
     "nav.market": "Market data",
+    "nav.backtest": "Backtest",
+    "navshort.backtest": "Backtest",
     "navshort.market": "Market",
     "navshort.pricer": "Pricer",
     "navshort.greeks": "Greeks",
@@ -60,6 +62,11 @@ TEXT: dict[str, Entry] = {
     # ---------------------------------------------------------------- guide
     # First-run guide. Text in [BRACKETS] is shown as an on-screen label. Lines starting
     # with "- " become bullet points.
+    "share.button": "Share link",
+    "share.help": "Copy a link that opens this tool with exactly these settings",
+    "share.caption": "Anyone who opens this link sees this tool with exactly the settings you have now. Use the copy icon on the right.",
+    "report.button": "Generate report",
+    "report.help": "Download a report of these inputs, results and charts (HTML; print it to PDF from your browser)",
     "guide.button": "Guide",
     "guide.button.help": "Open the step-by-step guide to the app",
     "guide.dialog_title": "Guide",
@@ -88,9 +95,10 @@ TEXT: dict[str, Entry] = {
     ),
     "guide.tools.title": "The tools",
     "guide.tools.body": (
-        "Across the top are seven tools. You're on [PRICER] now.\n"
+        "Across the top are eight tools. You're on [PRICER] now.\n"
         "- [PRICER]: price one option and see what drives it\n"
         "- [MARKET]: load a real US stock and use its numbers\n"
+        "- [BACKTEST]: replay a strategy on a stock's real history\n"
         "- [GREEKS]: watch how the risks change with price and time\n"
         "- [PAYOFF]: see what a strategy makes or loses\n"
         "- [SURFACE]: see how much movement the market expects\n"
@@ -501,7 +509,7 @@ TEXT: dict[str, Entry] = {
     "pay.title": {"plain": "What could I make or lose?", "pro": "Payoff & P&L"},
     "pay.lede": {
         "plain": "Choose a strategy. The chart shows your profit or loss for every possible asset price, today and at expiry.",
-        "pro": "Expiry payoff and Black-Scholes mark-to-model P&L for single and multi-leg strategies (entry at model prices, no financing or costs).",
+        "pro": "Expiry payoff and mark-to-model P&L for single and multi-leg strategies, at model prices or (optionally) live quotes.",
     },
     "pay.strategy": {"plain": "Strategy", "pro": "Strategy"},
     "pay.center": {"plain": "Main agreed price", "pro": "Central strike K"},
@@ -546,6 +554,46 @@ TEXT: dict[str, Entry] = {
     "pay.col.instrument": "Instrument",
     "pay.col.strike": "Strike",
     "pay.col.premium": "Premium (each)",
+    "pay.live": {"plain": "Use real market prices", "pro": "Price from live option chain"},
+    "pay.live.help": {
+        "plain": "Off: options are priced with the model. On: each option uses today's real quote for the stock loaded in MARKET (you buy at the asking price, sell at the bid).",
+        "pro": "Snaps legs to listed strikes of the MARKET ticker; longs fill at the ask, shorts at the bid, each with its own implied vol. Off by default (model prices).",
+    },
+    "pay.live.ticker_note": "Using {ticker} from the MARKET tool. Load a different stock there to change it.",
+    "pay.live.expiry": {"plain": "Expiry date", "pro": "Expiry"},
+    "pay.live.unavailable": "Live quotes aren't available right now. Turn this off to use model prices, or load a stock with listed options in MARKET.",
+    "pay.live.no_quote": "Some legs have no usable market quote and were left out.",
+    "pay.live.spot": "Spot",
+    "pay.live.ticker": "Ticker",
+    "pay.live.days": "Expiry",
+    "pay.live.atm": "ATM IV",
+    "pay.live.at_market": "at market",
+    "pay.pop": {"plain": "Chance of making money", "pro": "Prob. of profit"},
+    "pay.pop.pro": "Probability of profit",
+    "pay.pop.sub": {"plain": "model estimate", "pro": "risk-neutral"},
+    "pay.move": {"plain": "Typical move by expiry", "pro": "Expected move (1σ)"},
+    "pay.move.pro": "Expected move (1 sd)",
+    "pay.max_profit.pro": "Max profit",
+    "pay.max_loss.pro": "Max loss",
+    "pay.breakeven.pro": "Breakeven(s)",
+    "pay.col.bid": "Bid",
+    "pay.col.ask": "Ask",
+    "pay.col.iv": "IV",
+    "pay.legs.title.pro": "Legs",
+    "pay.greeks.title.pro": "Position Greeks",
+    "pay.report_title": "Option strategy analysis",
+    "pay.report.setup": "Setup",
+    "pay.report.results": "Results",
+    "pay.report.chart": "Profit and loss",
+    "pay.report.method": "Method",
+    "pay.report.method_body": (
+        "Expiry P&L is each leg's payoff minus the cost of entering the position. P&L before expiry marks each "
+        "option to Black-Scholes-Merton (with its own implied volatility when live quotes are used). Probability "
+        "of profit integrates the expiry P&L against the risk-neutral lognormal distribution of the stock price, "
+        "so it is a model estimate rather than a forecast. The expected move is one standard deviation, spot x "
+        "volatility x sqrt(time). Financing, early exercise and transaction costs beyond the quoted spread are "
+        "not included."
+    ),
     "strategy.long_call": {"plain": "Buy a call", "pro": "Long call"},
     "strategy.long_put": {"plain": "Buy a put", "pro": "Long put"},
     "strategy.straddle": {"plain": "Bet on a big move (straddle)", "pro": "Straddle"},
@@ -824,6 +872,157 @@ TEXT: dict[str, Entry] = {
     "mk.col.oi": "Open interest",
     "vs.source.market": {"plain": "Real market ({ticker})", "pro": "Market ({ticker})"},
     "vs.market.note": "Market quotes for {ticker} on {date}: {n} out-of-the-money options across {k} expiries.",
+
+    # -------------------------------------------------------------- backtest
+    "bt.title": {"plain": "How would it have done?", "pro": "Backtest"},
+    "bt.lede": {
+        "plain": "Replay an option strategy on a real stock's history and compare it with simply owning the shares.",
+        "pro": "Rolling option strategies on real prices; options model-priced from trailing realised vol.",
+    },
+    "bt.report_title": "Strategy backtest",
+    "pricer.report_title": "Option valuation",
+    "pricer.report.setup": "Contract and market data",
+    "pricer.report.price": "Price by method",
+    "pricer.report.greeks": "Greeks (market units)",
+    "pricer.report.method": "Method",
+    "pricer.report.method_body": (
+        "The option is priced four independent ways: the Black-Scholes-Merton closed form (Garman-Kohlhagen for FX), "
+        "a Cox-Ross-Rubinstein binomial tree, Monte Carlo simulation with antithetic variates and a control variate, "
+        "and a Crank-Nicolson finite-difference solver. Greeks are analytical for Black-Scholes and finite "
+        "differences for the numerical methods. Vega is per volatility point, theta per calendar day and rho per 1%."
+    ),
+    "mk.report_title": "Market data analysis",
+    "val.report_title": "Numerical validation",
+    "val.report.case": "Test contract",
+    "val.report.orders": "Measured vs theoretical order of convergence",
+    "val.report.mc": "Monte Carlo variance reduction",
+    "val.report.pde": "Crank-Nicolson error by grid size",
+    "val.report.greeks": "Greeks: numerical vs analytical",
+    "val.report.method": "Method",
+    "val.report.method_body": (
+        "Each numerical method is run at increasing resolution and compared with the Black-Scholes closed form. "
+        "The empirical order of convergence is the least-squares slope of log(error) against log(resolution). "
+        "Theory predicts order 1 for the CRR tree, 2 for Crank-Nicolson and 1/2 for the Monte Carlo standard error."
+    ),
+    "bt.data": {"plain": "The stock", "pro": "Data"},
+    "bt.strategy": {"plain": "The strategy", "pro": "Strategy"},
+    "bt.strategy.buy_and_hold": {"plain": "Just own the shares", "pro": "Buy and hold"},
+    "bt.strategy.covered_call": {"plain": "Covered call", "pro": "Covered call"},
+    "bt.strategy.protective_put": {"plain": "Protective put", "pro": "Protective put"},
+    "bt.strategy.collar": {"plain": "Collar", "pro": "Collar"},
+    "bt.strategy.cash_secured_put": {"plain": "Cash-secured put", "pro": "Cash-secured put"},
+    "bt.strategy.long_straddle": {"plain": "Long straddle", "pro": "Long straddle"},
+    "bt.strategy.long_strangle": {"plain": "Long strangle", "pro": "Long strangle"},
+    "bt.strategy.bull_call_spread": {"plain": "Bull call spread", "pro": "Bull call spread"},
+    "bt.strategy.bear_put_spread": {"plain": "Bear put spread", "pro": "Bear put spread"},
+    "bt.strategy.iron_condor": {"plain": "Iron condor", "pro": "Iron condor"},
+    "bt.strategy.buy_and_hold.desc": "Hold one share the whole time. The benchmark everything else is compared with.",
+    "bt.strategy.covered_call.desc": "Own the shares and sell a call above the price each period: earn premium, give up big gains.",
+    "bt.strategy.protective_put.desc": "Own the shares and buy a put below the price each period: insurance against falls.",
+    "bt.strategy.collar.desc": "Own the shares, buy a put below and sell a call above: the call pays for the insurance.",
+    "bt.strategy.cash_secured_put.desc": "Keep cash and sell a put below the price each period: paid to wait for a lower entry.",
+    "bt.strategy.long_straddle.desc": "Buy a call and a put at today's price each period: wins on big moves either way.",
+    "bt.strategy.long_strangle.desc": "Buy a call above and a put below each period: a cheaper bet on big moves.",
+    "bt.strategy.bull_call_spread.desc": "Buy a call at today's price, sell one above: a cheaper, capped bet on a rise.",
+    "bt.strategy.bear_put_spread.desc": "Buy a put at today's price, sell one below: a cheaper, capped bet on a fall.",
+    "bt.strategy.iron_condor.desc": "Sell a put below and a call above, buy further-out wings: paid if the price stays in a range.",
+    "bt.tenor": {"plain": "Roll every", "pro": "Tenor [days]"},
+    "bt.tenor.help": {
+        "plain": "How long each set of options lasts before the strategy opens the next one.",
+        "pro": "Calendar days to expiry for each cycle; options are held to expiry and rolled.",
+    },
+    "bt.otm_call": {"plain": "Call this far above the price (%)", "pro": "Call OTM [%]"},
+    "bt.otm_call.help": "Strike of the call as a percentage above the stock price on the day it's opened.",
+    "bt.otm_put": {"plain": "Put this far below the price (%)", "pro": "Put OTM [%]"},
+    "bt.otm_put.help": "Strike of the put as a percentage below the stock price on the day it's opened.",
+    "bt.wing": {"plain": "Protection wings (%)", "pro": "Wing width [%]"},
+    "bt.wing.help": "How much further out the protective options are bought, as a percentage of the price.",
+    "bt.assumptions": {"plain": "Assumptions", "pro": "Model and cost assumptions"},
+    "bt.window": {"plain": "Movement measured over", "pro": "Realised-vol window"},
+    "bt.window.help": "How many trading days of past prices are used to estimate volatility when pricing each option.",
+    "bt.vol_premium": {"plain": "Extra the market charges (%)", "pro": "Vol premium [%]"},
+    "bt.vol_premium.help": {
+        "plain": "Options usually cost more than past movement alone suggests. 10% prices options at 1.1x the measured movement.",
+        "pro": "Pricing vol = realised vol x (1 + premium). Implied vol has historically exceeded realised vol on average.",
+    },
+    "bt.rate": {"plain": "Interest rate (%)", "pro": "Risk-free [r] (%)"},
+    "bt.rate.help": "Interest earned on cash and used in option pricing. Defaults to the current 13-week T-bill rate.",
+    "bt.spread": {"plain": "Bid-ask spread (% of option price)", "pro": "Spread [% of price]"},
+    "bt.spread.help": "The gap between buying and selling prices. Half of it is paid on each option opened.",
+    "bt.commission": {"plain": "Commission per contract ($)", "pro": "Commission [$/contract]"},
+    "bt.commission.help": "Broker fee per option contract (100 shares). $0.65 is typical for US retail brokers.",
+    "bt.strike_step": {"plain": "Round strikes to", "pro": "Strike increment"},
+    "bt.strike_step.help": "Listed options only exist at certain strikes (often $1, $2.50 or $5 apart).",
+    "bt.exact": "Exact",
+    "bt.range": {"plain": "Dates to test", "pro": "Backtest window"},
+    "bt.range.help": "The first few weeks are used to measure volatility before the first trade.",
+    "bt.summary": {"plain": "Results", "pro": "Performance"},
+    "bt.total_return": {"plain": "Total return", "pro": "Total return"},
+    "bt.total_return.pro": "Total return",
+    "bt.annual_return": {"plain": "Per year", "pro": "Annualised return"},
+    "bt.volatility": {"plain": "Ups and downs", "pro": "Annualised vol"},
+    "bt.sharpe": {"plain": "Return per unit of risk", "pro": "Sharpe ratio"},
+    "bt.drawdown": {"plain": "Worst fall from a peak", "pro": "Max drawdown"},
+    "bt.win_rate": {"plain": "Periods that made money", "pro": "Win rate"},
+    "bt.premium": {"plain": "Net option cash received", "pro": "Net premium"},
+    "bt.costs": {"plain": "Trading costs paid", "pro": "Costs"},
+    "bt.cycles": "cycles",
+    "bt.per_share": "per share",
+    "bt.bh_short": "Buy & hold",
+    "bt.bh_long": "Buy & hold {ticker}",
+    "bt.verdict.better": "beat",
+    "bt.verdict.worse": "trailed",
+    "bt.explain": (
+        "From {start} to {end}, the {strategy} on {ticker} returned {ret}, which {verdict} simply owning the "
+        "shares ({bh}). Its worst fall from a peak was {dd}, against {bhdd} for the shares."
+    ),
+    "bt.caveat": (
+        "Options are priced with Black-Scholes from the stock's recent realised volatility (plus the premium above), "
+        "not from historical option quotes, which aren't freely available. Treat results as a model-based estimate "
+        "and say so in your write-up."
+    ),
+    "bt.equity": {"plain": "Growth of $100", "pro": "Equity curve (rebased to 100)"},
+    "bt.equity.pro": "Equity curve (rebased to 100)",
+    "bt.equity.y": {"plain": "Value of $100", "pro": "Value (start = 100)"},
+    "bt.drawdown_chart": {"plain": "Falls from the previous high", "pro": "Drawdown"},
+    "bt.drawdown_chart.pro": "Drawdown",
+    "bt.drawdown.y": {"plain": "Below previous high (%)", "pro": "Drawdown (%)"},
+    "bt.cycle_chart": {"plain": "Profit or loss each period", "pro": "P&L by cycle"},
+    "bt.cycle_chart.pro": "P&L by cycle",
+    "bt.cycle_chart.lede": {
+        "plain": "Each bar is one round of options, from opening to expiry, including the stock's move.",
+        "pro": "Change in portfolio value over each roll (per share), including the stock leg.",
+    },
+    "bt.cycle_chart.y": {"plain": "Profit / loss ($)", "pro": "P&L per share"},
+    "bt.cycle_pnl": "P&L",
+    "bt.log": {"plain": "Every trade", "pro": "Trade log"},
+    "bt.log.pro": "Trade log",
+    "bt.col.open": "Opened",
+    "bt.col.expiry": "Expired",
+    "bt.col.spot_open": "Price at open",
+    "bt.col.spot_expiry": "Price at expiry",
+    "bt.col.sigma": "Vol used",
+    "bt.col.strikes": "Strikes",
+    "bt.col.premium": "Premium",
+    "bt.col.costs": "Costs",
+    "bt.col.payoff": "Payoff",
+    "bt.col.pnl": "Cycle P&L",
+    "bt.download.daily": "Download daily values (CSV)",
+    "bt.download.log": "Download trade log (CSV)",
+    "bt.report.setup": "Setup",
+    "bt.report.results": "Results",
+    "bt.report.method": "Method and limitations",
+    "bt.report.method_body": (
+        "Capital starts at one share's price. Strategies holding stock keep one share throughout; remaining "
+        "capital is cash earning the risk-free rate. On each roll date the option legs are opened with strikes "
+        "set relative to the current price and an expiry the chosen number of days later, held to expiry, settled "
+        "at intrinsic value and replaced. Positions are marked daily with Black-Scholes-Merton.\n"
+        "Option prices are model prices: each option is priced from the stock's trailing realised volatility, "
+        "scaled by the volatility premium, because historical option quotes are not freely available. Real fills "
+        "would differ, especially for short-dated or far out-of-the-money options and around earnings. Early "
+        "exercise of American options, margin requirements and taxes are not modelled. Dividends are paid in cash "
+        "on shares held. The benchmark buys one share at the start and keeps dividends in cash earning the same rate."
+    ),
 
     # -------------------------------------------------------------- methods
     "methods.title": {"plain": "How it works", "pro": "Methods"},
