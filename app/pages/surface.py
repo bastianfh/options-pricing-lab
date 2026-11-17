@@ -29,6 +29,7 @@ from app.ui import (
     tx,
     upper,
 )
+from marketdata.parse import surface_from_chains
 from pricing.implied_vol import (
     SmileParameters,
     VolSurface,
@@ -44,16 +45,22 @@ init_state()
 left, right = st.columns([1, 2.3], gap="large")
 with left, panel("vs_inputs"):
     panel_title(tx("vs.source"))
+    market = st.session_state.get("mk_surface")
+    sources = ["synthetic"] + (["market"] if market else []) + (["upload"] if is_pro() else [])
     source = "synthetic"
-    if is_pro():
+    if len(sources) > 1:
+        if st.session_state.get("vs_source") not in sources:
+            st.session_state["vs_source"] = "market" if market else "synthetic"
         source = st.segmented_control(
-            lbl("vs.source"), ["synthetic", "upload"], format_func=lambda v: upper(tx(f"vs.source.{v}")),
-            key="vs_source", default="synthetic", required=True, label_visibility="collapsed",
-            persist_state="session", width="stretch",
+            lbl("vs.source"), sources,
+            format_func=lambda v: upper(tx(f"vs.source.{v}", ticker=market["ticker"] if market else "")),
+            key="vs_source", required=True, label_visibility="collapsed", width="stretch",
         )
     uploaded = None
     if source == "upload":
         uploaded = st.file_uploader(upper(t("vs.upload.help")), type=["csv"], key="vs_upload")
+    elif source == "market":
+        st.html(f'<p class="opl-note">{html.escape(t("vs.market.note", ticker=market["ticker"], date=market["date"], n=len(market["quotes"]["strike"]), k=market["expiries"]))}</p>')
     else:
         st.slider(lbl("vs.atm"), 3.0, 80.0, 20.0, 0.5, key="vs_atm", help=tx("vs.atm.help"), persist_state="session")
         st.slider(lbl("vs.skew"), -0.30, 0.30, -0.10, 0.01, key="vs_skew", help=tx("vs.skew.help"), persist_state="session")
@@ -61,25 +68,26 @@ with left, panel("vs_inputs"):
         st.slider(lbl("vs.term"), -0.15, 0.15, 0.03, 0.01, key="vs_term", help=tx("vs.term.help"), persist_state="session")
 
     st.html('<div style="height:0.8rem"></div>')
-    panel_title(tx("inputs.market"))
-    st.segmented_control(
-        lbl("in.asset.label"), ["stock", "fx"], format_func=lambda v: upper(tx(f"in.asset.{v}")), key="in_asset",
-        required=True, on_change=_on_asset_change, persist_state="session", width="stretch",
-    )
-    ctx = context()
-    if ctx.is_fx:
-        st.selectbox(lbl("in.pair.label"), list(FX_PAIRS), key="in_pair", on_change=_on_pair_change,
-                     persist_state="session")
+    if source != "market":  # market quotes carry their own spot, rate and dividend yield
+        panel_title(tx("inputs.market"))
+        st.segmented_control(
+            lbl("in.asset.label"), ["stock", "fx"], format_func=lambda v: upper(tx(f"in.asset.{v}")), key="in_asset",
+            required=True, on_change=_on_asset_change, persist_state="session", width="stretch",
+        )
         ctx = context()
-    fmt = "%.4f" if ctx.is_fx else "%.2f"
-    st.number_input(lbl("in.S.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_S",
-                    help=tx("in.S.help"), persist_state="session")
-    rate_key, carry_key = ("in.r_fx", "in.q_fx") if ctx.is_fx else ("in.r", "in.q")
-    names = dict(base=ctx.base, quote=ctx.quote)
-    st.number_input(lbl(f"{rate_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_r",
-                    help=tx(f"{rate_key}.help"), persist_state="session")
-    st.number_input(lbl(f"{carry_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_q",
-                    help=tx(f"{carry_key}.help"), persist_state="session")
+        if ctx.is_fx:
+            st.selectbox(lbl("in.pair.label"), list(FX_PAIRS), key="in_pair", on_change=_on_pair_change,
+                         persist_state="session")
+            ctx = context()
+        fmt = "%.4f" if ctx.is_fx else "%.2f"
+        st.number_input(lbl("in.S.label"), min_value=1e-4, step=ctx.spot_step, format=fmt, key="in_S",
+                        help=tx("in.S.help"), persist_state="session")
+        rate_key, carry_key = ("in.r_fx", "in.q_fx") if ctx.is_fx else ("in.r", "in.q")
+        names = dict(base=ctx.base, quote=ctx.quote)
+        st.number_input(lbl(f"{rate_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_r",
+                        help=tx(f"{rate_key}.help"), persist_state="session")
+        st.number_input(lbl(f"{carry_key}.label", **names), -5.0, 50.0, step=0.25, format="%.2f", key="in_q",
+                        help=tx(f"{carry_key}.help"), persist_state="session")
 
 s = st.session_state
 S, r, q = float(s["in_S"]), float(s["in_r"]) / 100, float(s["in_q"]) / 100
@@ -126,7 +134,10 @@ def build_uploaded(data: bytes, S: float, r: float, q: float) -> VolSurface:
 
 
 diag = None
-if source == "upload":
+if source == "market":
+    S, r, q = float(market["S"]), float(market["r"]), float(market["q"])
+    surface = surface_from_chains(pd.DataFrame(market["quotes"]), S, r, q)
+elif source == "upload":
     if uploaded is None:
         params = SmileParameters()
         surface, _ = build_synthetic(S, r, q, params)
@@ -177,13 +188,14 @@ with right:
     with c1:
         section(tx("vs.smile.title"))
         picks = [i for i, T in enumerate(surface.expiries) if np.isclose(T, [1 / 12, 3 / 12, 6 / 12, 1.0, 2.0]).any()]
-        if len(picks) < 2:
-            picks = list(range(min(5, len(surface.expiries))))
+        if len(picks) < 2:  # market expiries: spread five slices across what was loaded
+            n_exp = len(surface.expiries)
+            picks = sorted({int(round(x)) for x in np.linspace(0, n_exp - 1, min(5, n_exp))})
         ramp = p.vol_ramp[::-1][: len(picks)] if len(picks) <= len(p.vol_ramp) else p.vol_ramp
         fig = go.Figure()
         for n, i in enumerate(picks):
             T = surface.expiries[i]
-            label = f"{T * 12:.0f}M" if T < 1 else f"{T:g}Y"
+            label = f"{T * 365:.0f}D" if T < 0.25 else (f"{T * 12:.0f}M" if T < 1 else f"{T:.1f}Y")
             fig.add_trace(go.Scatter(x=moneyness, y=vols_pct[i], name=label, mode="lines",
                                      line=dict(color=ramp[min(n, len(ramp) - 1)], width=2.2),
                                      hovertemplate="%{y:.2f}%"))
