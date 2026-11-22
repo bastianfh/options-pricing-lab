@@ -29,6 +29,9 @@ from pricing.backtest import (
     legs_to_code,
     performance,
     run_backtest,
+    sized_legs,
+    sizes_from_code,
+    sizes_to_code,
     template_legs,
     upside_exposure,
 )
@@ -52,9 +55,29 @@ for key, value in DEFAULTS.items():
     s.setdefault(key, value)
 # Inputs that are only drawn for some strategies: re-assigning keeps their values while hidden
 # (Streamlit otherwise drops the state of widgets that weren't drawn on the last run).
-for key in ("bt_otm_call", "bt_otm_put", "bt_wing", "bt_name"):
+for key in ("bt_otm_call", "bt_otm_put", "bt_wing", "bt_name", *(k for k in list(s.keys()) if str(k).startswith("bt_qty_"))):
     if key in s:
         s[key] = s[key]
+
+
+def _size_key(name: str, i: int) -> str:
+    return f"bt_qty_{name}_{i}"
+
+
+def _sizes(name: str) -> list[float]:
+    return [float(s.get(_size_key(name, i), 1.0)) for i in range(len(template_legs(name)))]
+
+
+if not s.get("_bt_qty_seeded"):  # sizes from a shared link apply to the linked strategy, once
+    s["_bt_qty_seeded"] = True
+    if s.get("bt_qty") and s["bt_strategy"] in TEMPLATE_NAMES:
+        try:
+            shared_sizes = sizes_from_code(s["bt_qty"])
+        except ValueError:
+            shared_sizes = ()
+        if len(shared_sizes) == len(template_legs(s["bt_strategy"])):
+            for i, x in enumerate(shared_sizes):
+                s[_size_key(s["bt_strategy"], i)] = x
 
 
 if s["bt_strategy"] != "custom":
@@ -64,7 +87,8 @@ if s["bt_strategy"] != "custom":
 def _template_code(name: str) -> str:
     # Also called from callbacks, which run before the defaults above are filled in.
     pct = {k: float(s.get(k, DEFAULTS[k])) / 100 for k in ("bt_otm_call", "bt_otm_put", "bt_wing")}
-    return legs_to_code(template_legs(name, pct["bt_otm_call"], pct["bt_otm_put"], pct["bt_wing"]))
+    legs = template_legs(name, pct["bt_otm_call"], pct["bt_otm_put"], pct["bt_wing"])
+    return legs_to_code(sized_legs(legs, _sizes(name)))
 
 
 def _seed_legs(code: str) -> None:
@@ -197,6 +221,17 @@ with left, panel("bt_inputs"):
                         help=tx("bt.otm_put.help"))
     if strategy == "iron_condor":
         st.number_input(lbl("bt.wing"), 0.5, 50.0, step=1.0, format="%.1f", key="bt_wing", help=tx("bt.wing.help"))
+    if strategy in TEMPLATE_NAMES and strategy != "buy_and_hold":
+        st.html('<div style="height:0.6rem"></div>')
+        panel_title(tx("bt.sizes"))
+        base_legs = template_legs(strategy)
+        size_cols = st.columns(2, gap="small")
+        for i, leg in enumerate(base_legs):
+            side = t(f"bt.custom.side.{'buy' if leg.quantity > 0 else 'sell'}")
+            s.setdefault(_size_key(strategy, i), 1.0)
+            with size_cols[i % 2]:
+                st.number_input(upper(f"{side} {t(f'bt.custom.kind.{leg.kind}')}"), 0.5, MAX_QUANTITY, step=0.5,
+                                format="%g", key=_size_key(strategy, i), help=tx("bt.sizes.help"))
 
     with st.expander(upper(tx("bt.assumptions")), expanded=is_pro()):
         st.segmented_control(lbl("bt.window"), [21, 63, 126], format_func=lambda w: f"{w}D", key="bt_window",
@@ -249,9 +284,15 @@ with right:
     s["bt_start"], s["bt_end"] = window[0].isoformat(), window[1].isoformat()
 
     q = hist.dividend_yield
+    sizes = _sizes(strategy) if strategy in TEMPLATE_NAMES else []
+    if sizes and any(x != 1 for x in sizes):
+        s["bt_qty"] = sizes_to_code(sizes)
+    else:
+        s.pop("bt_qty", None)
     config = BacktestConfig(
         legs=tuple(custom_legs) if strategy == "custom"
-        else template_legs(strategy, s["bt_otm_call"] / 100, s["bt_otm_put"] / 100, s["bt_wing"] / 100),
+        else sized_legs(template_legs(strategy, s["bt_otm_call"] / 100, s["bt_otm_put"] / 100, s["bt_wing"] / 100),
+                        sizes),
         tenor_days=int(s["bt_tenor"]),
         vol_window=int(s["bt_window"]),
         vol_premium=float(s["bt_vol_premium"]) / 100,
@@ -275,6 +316,8 @@ with right:
         strat_name = " ".join(str(s.get("bt_name") or "").split()) or t("bt.custom.default_name")
     else:
         strat_name = tx(f"bt.strategy.{strategy}")
+        if any(x != 1 for x in sizes):
+            strat_name += f" ({':'.join(f'{x:g}' for x in sizes)})"
 
     def pct(x: float, digits: int = 1) -> str:
         return "–" if x is None or not math.isfinite(x) else f"{100 * x:+.{digits}f}%".replace("-", "−")

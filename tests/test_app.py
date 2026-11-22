@@ -161,3 +161,25 @@ def test_custom_strategy_without_saved_legs_starts_from_a_template() -> None:
     at.run()
     assert not at.exception, [e.message for e in at.exception]
     assert at.session_state["bt_legs_seed"] == "s+1,c-1@105"
+
+
+def test_backtest_template_leg_sizes_change_the_strategy() -> None:
+    at = _start("Pro")
+    at.session_state["bt_strategy"] = "long_straddle"
+    at.session_state["bt_qty_long_straddle_0"] = 2.0  # two calls for every put: a strap
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["bt_qty"] == "2,1"  # recorded for share links
+    assert [n.label for n in at.number_input if n.key.startswith("bt_qty_")] == ["BUY CALL", "BUY PUT"]
+
+
+def test_shared_link_sizes_apply_to_the_linked_strategy() -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    for k, v in {"guide": "off", "bt": "bull_call_spread", "qty": "1,2"}.items():
+        at.query_params[k] = v
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["bt_qty_bull_call_spread_1"] == 2.0
+    assert any("no limit" in w.value for w in at.warning)  # a 1x2 call spread is short a naked call

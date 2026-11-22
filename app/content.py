@@ -984,6 +984,12 @@ TEXT: dict[str, Entry] = {
     "bt.otm_put.help": "Strike of the put as a percentage below the stock price on the day it's opened.",
     "bt.wing": {"plain": "Protection wings (%)", "pro": "Wing width [%]"},
     "bt.wing.help": "How much further out the protective options are bought, as a percentage of the price.",
+    "bt.sizes": {"plain": "How many of each", "pro": "Leg sizes"},
+    "bt.sizes.help": (
+        "How many of this leg to trade, per share of stock (1 = one option on one share; a contract covers 100). "
+        "Uneven sizes change the bet: 2 calls with 1 put makes a straddle lean towards a rise, 1 call with 2 puts "
+        "leans towards a fall. Buying more than 1 share borrows the extra at the interest rate."
+    ),
     "bt.assumptions": {"plain": "Assumptions", "pro": "Model and cost assumptions"},
     "bt.window": {"plain": "Movement measured over", "pro": "Realised-vol window"},
     "bt.window.help": "How many trading days of past prices are used to estimate volatility when pricing each option.",

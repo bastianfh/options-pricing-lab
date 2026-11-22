@@ -52,6 +52,12 @@ def _legs(v: str) -> str:
     return legs_to_code(legs_from_code(v))
 
 
+def _sizes(v: str) -> str:
+    from pricing.backtest import sizes_from_code, sizes_to_code
+
+    return sizes_to_code(sizes_from_code(v))
+
+
 def _name(v: str) -> str:
     v = " ".join(v.split())
     if not v or len(v) > 40 or not v.isprintable():
@@ -110,6 +116,7 @@ PAGE_PARAMS: dict[str, tuple[Param, ...]] = {
         Param("period", "bt_period", _choice("1y", "2y", "5y", "10y")),
         Param("bt", "bt_strategy", _choice(*BT_STRATEGIES)),
         Param("legs", "bt_legs", _legs),
+        Param("qty", "bt_qty", _sizes),
         Param("name", "bt_name", _name),
         Param("tenor", "bt_tenor", _num(7, 180, integer=True)),
         Param("otm_c", "bt_otm_call", _num(0, 50)),
@@ -188,6 +195,8 @@ def share_url(page: str, base_url: Optional[str] = None) -> str:
     if page == "backtest" and st.session_state.get("bt_strategy") != "custom":
         params.pop("legs", None)  # only custom strategies need their legs spelled out
         params.pop("name", None)
+    if page == "backtest" and st.session_state.get("bt_strategy") == "custom":
+        params.pop("qty", None)  # custom legs already carry their quantities
     if st.session_state.get("mode") == PRO:
         params["mode"] = PRO
     params["guide"] = "off"

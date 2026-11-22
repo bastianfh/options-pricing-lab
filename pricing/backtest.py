@@ -394,3 +394,31 @@ def cycle_payoff(
         intrinsic = np.maximum(s_t - k, 0.0) if leg.kind == "call" else np.maximum(k - s_t, 0.0)
         pnl += leg.quantity * (intrinsic - price)
     return pnl
+
+
+def sized_legs(legs: Sequence[LegTemplate], sizes: Sequence[float]) -> tuple[LegTemplate, ...]:
+    """``legs`` with each quantity's size replaced by ``sizes`` (the buy/sell side is kept).
+
+    Turns a long straddle into a strap with ``sizes=(2, 1)``: two calls for every put.
+    """
+    if len(sizes) != len(legs):
+        raise ValueError("Give one size per leg.")
+    out = []
+    for leg, size in zip(legs, sizes):
+        size = float(size)
+        if not (0 < size <= MAX_QUANTITY):
+            raise ValueError(f"Each size must be above 0 and at most {MAX_QUANTITY:g}.")
+        out.append(LegTemplate(leg.kind, math.copysign(size, leg.quantity), leg.moneyness))
+    return tuple(out)
+
+
+def sizes_from_code(code: str) -> tuple[float, ...]:
+    """Parse a size list such as ``"2,1"``."""
+    sizes = tuple(float(x) for x in str(code).replace(" ", "").split(",") if x)
+    if not sizes or len(sizes) > MAX_LEGS or not all(0 < x <= MAX_QUANTITY for x in sizes):
+        raise ValueError("Sizes must be 1 to 8 numbers above 0 and at most 10.")
+    return sizes
+
+
+def sizes_to_code(sizes: Sequence[float]) -> str:
+    return ",".join(f"{float(x):g}" for x in sizes)

@@ -171,3 +171,35 @@ def test_custom_strategy_runs_like_the_matching_template() -> None:
     a = run_backtest(dates, p, BacktestConfig(template_legs("collar")))
     b = run_backtest(dates, p, BacktestConfig(legs_from_code("s+1,p+1@95,c-1@105")))
     np.testing.assert_allclose(a.value, b.value)
+
+
+from pricing.backtest import sized_legs, sizes_from_code, sizes_to_code  # noqa: E402
+
+
+def test_sized_legs_keep_the_side_and_strike() -> None:
+    strap = sized_legs(template_legs("long_straddle"), (2, 1))
+    assert strap == (LegTemplate("call", 2, 1.0), LegTemplate("put", 1, 1.0))
+    ratio = sized_legs(template_legs("bull_call_spread"), (1, 2))
+    assert [leg.quantity for leg in ratio] == [1, -2]
+    assert upside_exposure(ratio) < 0  # a 1x2 call spread is naked short one call
+
+
+def test_doubling_every_leg_doubles_the_option_pnl() -> None:
+    dates, p = market()
+    one = run_backtest(dates, p, BacktestConfig(template_legs("long_straddle")))
+    two = run_backtest(dates, p, BacktestConfig(sized_legs(template_legs("long_straddle"), (2, 2))))
+    for field_ in ("premium", "payoff"):  # cycle P&L also holds interest on the cash, which doesn't scale
+        np.testing.assert_allclose([getattr(c, field_) for c in two.cycles],
+                                   [2 * getattr(c, field_) for c in one.cycles], rtol=1e-12)
+
+
+@pytest.mark.parametrize("bad", ["", "0", "-1", "11", "1,a", ",".join(["1"] * 9)])
+def test_bad_sizes_are_rejected(bad: str) -> None:
+    with pytest.raises(ValueError):
+        sizes_from_code(bad)
+
+
+def test_sizes_round_trip() -> None:
+    assert sizes_to_code(sizes_from_code("2, 1.5")) == "2,1.5"
+    with pytest.raises(ValueError):
+        sized_legs(template_legs("long_straddle"), (1,))
