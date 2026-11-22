@@ -39,7 +39,7 @@ The look is a dark trading terminal crossed with hardware-style panels: monospac
 |---|---|
 | **Pricer** | The starting page: price, all four methods side by side, the Greeks, and example scenarios |
 | **Market** | Load any real US stock (or upload a CSV/Excel file): price history, volatility, return stats, the live option chain, and a button that sends its real numbers to the pricer |
-| **Backtest** | Replay an option strategy (covered call, collar, iron condor…) on a stock's real history and compare it with buy-and-hold |
+| **Backtest** | Replay an option strategy (covered call, collar, iron condor… or one you build yourself) on a stock's real history and compare it with buy-and-hold |
 | **Greeks explorer** | Charts of how each Greek changes with the stock price and time |
 | **Payoff & P&L** | What a strategy makes or loses at expiry and before |
 | **Volatility surface** | 3D implied volatility surface and smile charts |
@@ -73,7 +73,7 @@ Live data comes from Yahoo Finance through the `yfinance` package: it's free but
 
 ## For class projects: backtests, reports and share links
 
-**Backtest a strategy.** Pick a stock, a strategy (covered call, protective put, collar, cash-secured put, straddle, strangle, bull/bear spreads, iron condor) and how often to roll it. The app replays it over up to 10 years of real prices and shows the equity curve against buy-and-hold, drawdowns, profit or loss per cycle, a full trade log, and return, volatility, Sharpe ratio, max drawdown and win rate. Costs (bid-ask spread and commission) and a volatility premium are adjustable.
+**Backtest a strategy.** Pick a stock, a strategy (covered call, protective put, collar, cash-secured put, straddle, strangle, bull/bear spreads, iron condor) and how often to roll it, or pick **Build your own** and put together up to 8 legs (buy or sell shares, calls and puts, with strikes as a % of the price). You can start from any ready-made strategy and tweak it, and a payoff chart shows what one period looks like so you can check you built what you meant. The app replays it over up to 10 years of real prices and shows the equity curve against buy-and-hold, drawdowns, profit or loss per cycle, a full trade log, and return, volatility, Sharpe ratio, max drawdown and win rate. Costs (bid-ask spread and commission) and a volatility premium are adjustable.
 
 One thing to state in a paper: free historical option prices don't exist, so the backtest prices each option with Black-Scholes using the stock's recent realised volatility. The app says this on the page and in every report.
 

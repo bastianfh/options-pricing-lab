@@ -927,6 +927,52 @@ TEXT: dict[str, Entry] = {
     "bt.strategy.bull_call_spread.desc": "Buy a call at today's price, sell one above: a cheaper, capped bet on a rise.",
     "bt.strategy.bear_put_spread.desc": "Buy a put at today's price, sell one below: a cheaper, capped bet on a fall.",
     "bt.strategy.iron_condor.desc": "Sell a put below and a call above, buy further-out wings: paid if the price stays in a range.",
+    "bt.strategy.custom": {"plain": "Build your own", "pro": "Custom legs"},
+    "bt.strategy.custom.desc": (
+        "Combine up to 8 legs: shares, calls and puts, bought or sold. Strikes are set as a percentage of "
+        "the stock price on the day the options are opened, and every option leg rolls on the same schedule."
+    ),
+    "bt.custom.start": {"plain": "Start from a ready-made one", "pro": "Load template"},
+    "bt.custom.start.help": "Fills the table with that strategy's legs so you can change them.",
+    "bt.custom.start.placeholder": "Pick a strategy to copy",
+    "bt.custom.legs": {"plain": "Your legs", "pro": "Legs"},
+    "bt.custom.legs.help": (
+        "One row per position; add rows with + and delete them by selecting a row. Quantity is per share of "
+        "stock: 1 means one option on one share (a contract covers 100). Strike is a percentage of the "
+        "stock price when the option is opened: 100 is at the money, 105 is 5% above. Share rows ignore the strike."
+    ),
+    "bt.custom.col.side": "Side",
+    "bt.custom.col.kind": "Type",
+    "bt.custom.col.qty": "Qty",
+    "bt.custom.col.strike": "Strike %",
+    "bt.custom.side.buy": "Buy",
+    "bt.custom.side.sell": "Sell",
+    "bt.custom.kind.call": "Call",
+    "bt.custom.kind.put": "Put",
+    "bt.custom.kind.stock": "Shares",
+    "bt.custom.name": {"plain": "Give it a name", "pro": "Strategy name"},
+    "bt.custom.name.help": "Shown on the charts and in the report. Up to 40 characters.",
+    "bt.custom.default_name": "Custom strategy",
+    "bt.custom.empty": "Add at least one leg with a quantity above zero to run the backtest.",
+    "bt.custom.trimmed": "Only the first 8 legs are used.",
+    "bt.custom.unlimited": (
+        "Heads up: this strategy is short more calls (or shares) than it owns, so its losses have no limit "
+        "if the stock rallies."
+    ),
+    "bt.custom.blown": (
+        "The portfolio's value fell to zero or below at some point, so the per-year return, volatility and "
+        "Sharpe ratio can't be calculated. In real life a broker would have closed the position with a margin call first."
+    ),
+    "bt.payoff": {"plain": "One period, start to finish", "pro": "Payoff at expiry (one cycle)"},
+    "bt.payoff.pro": "Payoff at expiry (one cycle)",
+    "bt.payoff.lede": {
+        "plain": "Profit or loss on $100 of stock when the options expire, depending on where the price ends up. "
+                 "Options are priced with today's volatility, before trading costs.",
+        "pro": "P&L per 100 of spot at expiry vs S_T, premium at the latest trailing vol (incl. vol premium), before costs.",
+    },
+    "bt.payoff.x": {"plain": "Stock price at expiry (% of today)", "pro": "S_T / S_0 (%)"},
+    "bt.payoff.y": {"plain": "Profit / loss ($)", "pro": "P&L per 100 spot"},
+    "bt.payoff.today": "Today",
     "bt.tenor": {"plain": "Roll every", "pro": "Tenor [days]"},
     "bt.tenor.help": {
         "plain": "How long each set of options lasts before the strategy opens the next one.",

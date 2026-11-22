@@ -117,3 +117,57 @@ def test_invalid_configs_raise() -> None:
         BacktestConfig(template_legs("collar"), spread=-0.1)
     with pytest.raises(ValueError):
         template_legs("martingale")
+
+
+# --------------------------------------------------------------------------- custom strategies
+
+from pricing.backtest import cycle_payoff, legs_from_code, legs_to_code, upside_exposure  # noqa: E402
+
+
+@pytest.mark.parametrize("name", TEMPLATE_NAMES)
+def test_leg_codes_round_trip_every_template(name: str) -> None:
+    legs = template_legs(name, 0.05, 0.07, 0.03)
+    back = legs_from_code(legs_to_code(legs))
+    assert [(b.kind, b.quantity) for b in back] == [(a.kind, a.quantity) for a in legs]
+    for a, b in zip(legs, back):
+        if a.kind != "stock":
+            assert b.moneyness == pytest.approx(a.moneyness)
+
+
+def test_leg_code_format_is_readable() -> None:
+    assert legs_to_code(template_legs("covered_call")) == "s+1,c-1@105"
+    assert legs_from_code(" s+1, p+2@90 ,c-0.5@110") == (
+        LegTemplate("stock", 1), LegTemplate("put", 2, 0.9), LegTemplate("call", -0.5, 1.1))
+
+
+@pytest.mark.parametrize("bad", ["", "x+1", "c+1", "c0@100", "c+11@100", "c+1@0", "s+1@100", "c+nan@100",
+                                 ",".join(["c+1@100"] * 9)])
+def test_bad_leg_codes_are_rejected(bad: str) -> None:
+    with pytest.raises(ValueError):
+        legs_from_code(bad)
+
+
+def test_upside_exposure_flags_naked_short_calls() -> None:
+    assert upside_exposure(template_legs("covered_call")) == 0
+    assert upside_exposure(legs_from_code("c-1@105")) < 0
+    assert upside_exposure(legs_from_code("s+1,c-2@105")) < 0
+    assert upside_exposure(template_legs("bull_call_spread")) == 0
+
+
+def test_cycle_payoff_matches_textbook_shapes() -> None:
+    grid = np.linspace(50, 150, 201)
+    cc = cycle_payoff(template_legs("covered_call"), grid, 30, 0.04, 0.25)
+    assert np.allclose(np.diff(cc[grid >= 105]), 0)  # capped above the strike
+    assert np.allclose(np.diff(cc[grid <= 100]), 0.5)  # moves one-for-one with the stock below it
+    straddle = cycle_payoff(template_legs("long_straddle"), grid, 30, 0.0, 0.25)
+    assert straddle.min() == pytest.approx(straddle[100]) and straddle[100] < 0  # worst at the strike
+    # Conversion (long stock, long put, short call, same strike) locks in a fixed P&L.
+    conv = cycle_payoff((LegTemplate("stock", 1), LegTemplate("put", 1), LegTemplate("call", -1)), grid, 30, 0.04, 0.3)
+    assert np.ptp(conv) < 1e-9
+
+
+def test_custom_strategy_runs_like_the_matching_template() -> None:
+    dates, p = market()
+    a = run_backtest(dates, p, BacktestConfig(template_legs("collar")))
+    b = run_backtest(dates, p, BacktestConfig(legs_from_code("s+1,p+1@95,c-1@105")))
+    np.testing.assert_allclose(a.value, b.value)

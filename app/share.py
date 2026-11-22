@@ -46,6 +46,19 @@ def _iso_date(v: str) -> str:
     return date.fromisoformat(v).isoformat()
 
 
+def _legs(v: str) -> str:
+    from pricing.backtest import legs_from_code, legs_to_code
+
+    return legs_to_code(legs_from_code(v))
+
+
+def _name(v: str) -> str:
+    v = " ".join(v.split())
+    if not v or len(v) > 40 or not v.isprintable():
+        raise ValueError
+    return v
+
+
 def _ticker(v: str) -> str:
     from marketdata.fetch import normalize_ticker
 
@@ -64,7 +77,7 @@ class Param:
 STRATEGIES = ("long_call", "long_put", "straddle", "strangle", "bull_call_spread", "bear_put_spread",
               "covered_call", "protective_put", "custom")
 BT_STRATEGIES = ("buy_and_hold", "covered_call", "protective_put", "collar", "cash_secured_put",
-                 "long_straddle", "long_strangle", "bull_call_spread", "bear_put_spread", "iron_condor")
+                 "long_straddle", "long_strangle", "bull_call_spread", "bear_put_spread", "iron_condor", "custom")
 
 # Settings used by every tool (the contract and market data), then per-tool settings.
 COMMON = (
@@ -96,6 +109,8 @@ PAGE_PARAMS: dict[str, tuple[Param, ...]] = {
         Param("ticker", "bt_ticker", _ticker),
         Param("period", "bt_period", _choice("1y", "2y", "5y", "10y")),
         Param("bt", "bt_strategy", _choice(*BT_STRATEGIES)),
+        Param("legs", "bt_legs", _legs),
+        Param("name", "bt_name", _name),
         Param("tenor", "bt_tenor", _num(7, 180, integer=True)),
         Param("otm_c", "bt_otm_call", _num(0, 50)),
         Param("otm_p", "bt_otm_put", _num(0, 50)),
@@ -170,6 +185,9 @@ def share_url(page: str, base_url: Optional[str] = None) -> str:
     for p in COMMON + PAGE_PARAMS.get(page, ()):
         if p.key in st.session_state and st.session_state[p.key] is not None:
             params[p.name] = _encode(st.session_state[p.key])
+    if page == "backtest" and st.session_state.get("bt_strategy") != "custom":
+        params.pop("legs", None)  # only custom strategies need their legs spelled out
+        params.pop("name", None)
     if st.session_state.get("mode") == PRO:
         params["mode"] = PRO
     params["guide"] = "off"

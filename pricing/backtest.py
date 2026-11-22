@@ -310,3 +310,87 @@ def template_legs(name: str, otm_call: float = 0.05, otm_put: float = 0.05, wing
     if name not in legs:
         raise ValueError(f"Unknown strategy '{name}'.")
     return tuple(legs[name])
+
+
+# ---------------------------------------------------------------------------
+# Custom strategies
+# ---------------------------------------------------------------------------
+
+MAX_LEGS = 8
+MAX_QUANTITY = 10.0
+_KIND_CODE = {"stock": "s", "call": "c", "put": "p"}
+_CODE_KIND = {v: k for k, v in _KIND_CODE.items()}
+
+
+def legs_to_code(legs: Sequence[LegTemplate]) -> str:
+    """A short text form of ``legs`` for links, e.g. ``"s+1,c-1@105"`` (strike as % of spot)."""
+    parts = []
+    for leg in legs:
+        code = f"{_KIND_CODE[leg.kind]}{leg.quantity:+g}"
+        if leg.kind != "stock":
+            code += f"@{round(100 * leg.moneyness, 4):g}"
+        parts.append(code)
+    return ",".join(parts)
+
+
+def legs_from_code(code: str) -> tuple[LegTemplate, ...]:
+    """Parse :func:`legs_to_code` output, rejecting anything malformed or out of range."""
+    legs = []
+    for part in str(code).replace(" ", "").split(","):
+        if not part:
+            continue
+        kind = _CODE_KIND.get(part[0])
+        if kind is None:
+            raise ValueError(f"Unknown leg type in '{part}'.")
+        body, _, strike = part[1:].partition("@")
+        qty = float(body)
+        if not (0 < abs(qty) <= MAX_QUANTITY) or not math.isfinite(qty):
+            raise ValueError(f"Quantity out of range in '{part}'.")
+        if kind == "stock":
+            if strike:
+                raise ValueError("Share legs have no strike.")
+            legs.append(LegTemplate("stock", qty))
+        else:
+            m = float(strike) / 100
+            if not (0.01 <= m <= 5.0):
+                raise ValueError(f"Strike out of range in '{part}'.")
+            legs.append(LegTemplate(kind, qty, m))
+    if not legs:
+        raise ValueError("A strategy needs at least one leg.")
+    if len(legs) > MAX_LEGS:
+        raise ValueError(f"At most {MAX_LEGS} legs.")
+    return tuple(legs)
+
+
+def upside_exposure(legs: Sequence[LegTemplate]) -> float:
+    """Shares-equivalent exposure once every call is deep in the money; negative means losses
+    grow without limit as the stock rallies."""
+    return float(sum(leg.quantity for leg in legs if leg.kind in ("stock", "call")))
+
+
+def cycle_payoff(
+    legs: Sequence[LegTemplate],
+    terminal: Sequence[float],
+    tenor_days: int,
+    rate: float,
+    sigma: float,
+    dividend_yield: float = 0.0,
+    spot: float = 100.0,
+) -> np.ndarray:
+    """P&L per share of one cycle opened at ``spot`` and held to expiry, before costs and interest.
+
+    Options are bought or sold at their Black-Scholes price on opening, exactly as the
+    backtest prices them, and settle at intrinsic value at each terminal price.
+    """
+    s_t = np.asarray(terminal, dtype=float)
+    tau = tenor_days / 365.0
+    pnl = np.zeros_like(s_t)
+    for leg in legs:
+        if leg.kind == "stock":
+            pnl += leg.quantity * (s_t - spot)
+            continue
+        k = leg.moneyness * spot
+        price = float(black_scholes_price(spot, k, tau, rate, sigma, dividend_yield, leg.kind))
+        intrinsic = np.maximum(s_t - k, 0.0) if leg.kind == "call" else np.maximum(k - s_t, 0.0)
+        pnl += leg.quantity * (intrinsic - price)
+    return pnl

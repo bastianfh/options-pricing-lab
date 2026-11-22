@@ -138,3 +138,26 @@ def test_payoff_live_chain_mode_prices_legs_from_quotes(strategy: str) -> None:
     at.run()
     assert not at.exception, [e.message for e in at.exception]
     assert at.session_state["pay_expiry"] in ("2026-12-18", "2027-01-15")
+
+
+@pytest.mark.parametrize("legs", ["s+1,p+1@95,c-1@110", "c-1@105", "p+2@90,s+1", "c+1@100,c-2@105,c+1@110"])
+def test_backtest_runs_a_custom_strategy(legs: str) -> None:
+    at = _start("Pro")
+    at.session_state["bt_strategy"] = "custom"
+    at.session_state["bt_legs"] = legs
+    at.session_state["bt_name"] = "My spread"
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["bt_legs"] == legs
+    naked = legs == "c-1@105"
+    assert any("no limit" in w.value for w in at.warning) == naked
+
+
+def test_custom_strategy_without_saved_legs_starts_from_a_template() -> None:
+    at = _start(None)
+    at.session_state["bt_strategy"] = "custom"
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["bt_legs_seed"] == "s+1,c-1@105"

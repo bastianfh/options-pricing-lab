@@ -38,7 +38,8 @@ def test_params_cast_valid_values(name: str, raw: str, expected: object) -> None
 @pytest.mark.parametrize(
     "name,raw",
     [("S", "-5"), ("days", "99999"), ("live", "yes"), ("bt", "martingale"), ("ticker", "AAPL;DROP"),
-     ("from", "not-a-date"), ("vol", "nan-ish")],
+     ("from", "not-a-date"), ("vol", "nan-ish"), ("legs", "c+1"), ("legs", "x+1@100"), ("name", ""),
+     ("name", "x" * 41)],
 )
 def test_params_reject_bad_values(name: str, raw: str) -> None:
     param = next(p for p in ALL_PARAMS if p.name == name)
@@ -106,3 +107,24 @@ def test_report_escapes_user_text() -> None:
     r.params("Setup", {"<b>": "<img src=x onerror=alert(1)>"})
     doc = build_html(r)
     assert "<script>alert(1)</script>" not in doc and "<img src=x" not in doc
+
+
+def test_custom_backtest_link_carries_its_legs() -> None:
+    from app.share import share_url
+
+    import streamlit as st
+
+    param = next(p for p in ALL_PARAMS if p.name == "legs")
+    assert param.cast("s+1, c-1@105.0") == "s+1,c-1@105"
+    state = {"bt_strategy": "custom", "bt_legs": "s+1,c-1@105", "bt_name": "My collar"}
+    for key, value in state.items():
+        st.session_state[key] = value
+    try:
+        query = parse_qs(urlsplit(share_url("backtest", base_url="https://example.app/")).query)
+        st.session_state["bt_strategy"] = "covered_call"
+        plain = parse_qs(urlsplit(share_url("backtest", base_url="https://example.app/")).query)
+    finally:
+        for key in state:
+            del st.session_state[key]
+    assert query["bt"] == ["custom"] and query["legs"] == ["s+1,c-1@105"] and query["name"] == ["My collar"]
+    assert "legs" not in plain and "name" not in plain
