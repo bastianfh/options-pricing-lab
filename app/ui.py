@@ -110,18 +110,37 @@ def init_mode() -> None:
     Instead the mode lives in session state and the URL is updated by hand.
     """
     if "mode" not in st.session_state:
-        requested = str(st.query_params.get("mode", "")).strip().lower()
-        st.session_state["mode"] = {"pro": PRO, "simple": SIMPLE}.get(requested, PLAIN)
+        st.session_state["mode"] = mode_from_url(st.query_params)
+
+
+MODE_URL = {SIMPLE: "Simple", PLAIN: "Plain", PRO: "Pro"}
+
+
+def mode_from_url(query: object) -> str:
+    """The mode a link asks for. Simple is the default, except that a link carrying shared settings
+    (made before Simple became the default, or from a Plain English page) opens in Plain English."""
+    requested = str(query.get("mode", "") or "").strip().lower().replace("-", " ").replace("+", " ")
+    if requested in ("pro",):
+        return PRO
+    if requested in ("plain", "plain english", "plainenglish"):
+        return PLAIN
+    if requested == "simple":
+        return SIMPLE
+    from app.share import ALL_PARAMS  # local import: app.share imports app.content only
+
+    names = {p.name for p in ALL_PARAMS}
+    return PLAIN if any(k in names for k in query) else SIMPLE
 
 
 def mode_query_params() -> dict[str, str]:
-    return {"mode": mode()} if mode() != PLAIN else {}
+    return {"mode": MODE_URL[mode()]} if mode() != SIMPLE else {}
 
 
 def _sync_mode_param() -> None:
-    """Keep ``?mode=Pro`` / ``?mode=Simple`` in the address bar so the current view can be shared."""
-    if mode() != PLAIN:
-        st.query_params["mode"] = mode()
+    """Keep ``?mode=Plain`` / ``?mode=Pro`` in the address bar so the current view can be shared
+    (Simple, the default, needs nothing)."""
+    if mode() != SIMPLE:
+        st.query_params["mode"] = MODE_URL[mode()]
     elif "mode" in st.query_params:
         del st.query_params["mode"]
 

@@ -42,6 +42,8 @@ for (const name of pages) {
   // The first-run guide is off by default here so page screenshots stay clean (--query guide=on to show it).
   const params = [];
   if (mode === "pro") params.push("mode=Pro");
+  else if (mode === "simple") params.push("mode=Simple");
+  else params.push("mode=Plain");
   if (!extraQuery.includes("guide=")) params.push("guide=off");
   if (extraQuery) params.push(extraQuery.slice(1));
   const query = `?${params.join("&")}`;

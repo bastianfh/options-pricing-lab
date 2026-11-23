@@ -362,3 +362,23 @@ a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 
   .opl-simple-hero { grid-template-columns: minmax(0, 1fr) !important; }
   .opl-simple-grid > .opl-cell:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+
+/* ---------- chart snapshots: an always-visible, labelled SAVE IMAGE button ---------- */
+[class*="st-key-snap_"] .modebar-container { display: block !important; }
+[class*="st-key-snap_"] .modebar { background: transparent !important; opacity: 1 !important; }
+[class*="st-key-snap_"] .modebar-group { background: transparent !important; padding: 0 !important; }
+[class*="st-key-snap_"] .modebar-btn { display: inline-flex !important; align-items: center; gap: 0.35rem;
+  height: 24px !important; padding: 0 0.55rem !important; border: 1px solid var(--rule); background: var(--panel) !important; }
+[class*="st-key-snap_"] .modebar-btn svg { height: 12px !important; width: 12px !important; }
+[class*="st-key-snap_"] .modebar-btn svg path { fill: var(--label) !important; }
+/* Plotly draws its hover tooltip with ::before/::after; replace it with a permanent text label. */
+[class*="st-key-snap_"] .modebar-btn::before { display: none !important; }
+[class*="st-key-snap_"] .modebar-btn::after { content: "SAVE IMAGE" !important; position: static !important;
+  opacity: 1 !important; transform: none !important; background: none !important; box-shadow: none !important;
+  border: 0 !important; padding: 0 !important; margin: 0 !important; width: auto !important; display: inline !important;
+  white-space: nowrap; pointer-events: none; font-family: var(--mono) !important; font-size: 10px !important;
+  letter-spacing: 0.08em; line-height: 1 !important; color: var(--label) !important; }
+[class*="st-key-snap_"] .modebar-btn:hover { border-color: var(--accent); }
+[class*="st-key-snap_"] .modebar-btn:hover::after { color: var(--accent) !important; }
+[class*="st-key-snap_"] .modebar-btn:hover svg path { fill: var(--accent) !important; }
+[class*="st-key-snap_"] .modebar-container { right: 6px !important; top: 6px !important; }

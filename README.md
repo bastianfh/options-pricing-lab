@@ -24,19 +24,20 @@ You set up an option (stock or currency, call or put, strike, expiry, volatility
 - **Implied volatility:** works backwards from a price to the volatility the market is assuming, and plots it as a 3D surface.
 - **Profit and loss** for common strategies like straddles, spreads and covered calls.
 
-New here? A short **guide** opens on your first visit and walks you through where everything is, highlighting each part of the screen as it goes. You can reopen it anytime with **[?] GUIDE** in the top bar.
+The first time you switch to Plain English or Pro, a short **guide** walks you through where everything is, highlighting each part of the screen as it goes. You can reopen it anytime with **[?] GUIDE** in the top bar.
 
 ![The first-run guide highlighting the input panel](docs/images/guide.png)
 
 There's a **Simple / Plain English / Pro** switch in the top bar.
 
-- **Simple** is for complete beginners. It cuts the app down to two screens with no jargon:
+- **Simple** (the default) is for complete beginners. It cuts the app down to two screens with no jargon:
   - **Option price:** pick a stock, pick "price goes up" or "price goes down", a strike and when it ends. You see the cost, break-even, the most you can lose and make, the chance of profit, what happens if the stock moves ±10–20%, and a profit/loss chart.
   - **Backtest:** pick a stock, a strategy and a starting amount. You see what it became next to just owning the shares, the biggest drop, a low/medium/high risk level and how many months won. Volatility, rates and costs are filled in for you.
+  - Every chart has a **Save image** button (a sharp PNG), and **Generate report** downloads a one-page report of your choices, results and charts.
 - **Plain English** explains everything in everyday words.
 - **Pro** shows the proper notation and extra detail.
 
-To open the app straight in a mode, add [`?mode=Simple`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Simple) or [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
+The app opens in Simple. To open it straight in another mode, add [`?mode=Plain`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Plain) or [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link. Share links made on the other modes keep their mode.
 
 ## The app's pages
 

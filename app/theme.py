@@ -223,6 +223,29 @@ PLOTLY_CONFIG = {
 }
 
 
-def show(fig: go.Figure, key: Optional[str] = None) -> None:
-    """Render a styled figure. The theme is fully explicit, so Streamlit's own chart theme is disabled."""
-    st.plotly_chart(fig, theme=None, config=PLOTLY_CONFIG, key=key)
+def show(fig: go.Figure, key: Optional[str] = None, snapshot: Optional[str] = None) -> None:
+    """Render a styled figure. The theme is fully explicit, so Streamlit's own chart theme is disabled.
+
+    ``snapshot`` (a file name without extension) adds an always-visible SAVE IMAGE button that downloads
+    the chart as a 2x PNG in the browser. The figure gets a solid background so the image isn't transparent.
+    """
+    if snapshot is None:
+        st.plotly_chart(fig, theme=None, config=PLOTLY_CONFIG, key=key)
+        return
+    fig.update_layout(paper_bgcolor=PALETTE.canvas)
+    if fig.layout.margin.t is None or fig.layout.margin.t < 40:
+        fig.update_layout(margin=dict(t=40))  # room for the button above the plot
+    config = {
+        "displayModeBar": True,
+        "displaylogo": False,
+        "modeBarButtons": [["toImage"]],
+        "toImageButtonOptions": {"format": "png", "scale": 2, "filename": snapshot},
+    }
+    with st.container(key=f"snap_{key}"):
+        st.plotly_chart(fig, theme=None, config=config, key=key)
+
+
+def snapshot_name(*parts: object) -> str:
+    """A safe, readable file name such as ``AAPL-call-350-1-month``."""
+    text = "-".join(str(p) for p in parts if str(p))
+    return "".join(ch if ch.isalnum() or ch in "-." else "-" for ch in text).strip("-").replace("--", "-")

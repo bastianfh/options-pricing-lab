@@ -31,8 +31,7 @@ def offline_market_data(monkeypatch: pytest.MonkeyPatch) -> None:
 def _start(mode: str | None) -> AppTest:
     at = AppTest.from_file(APP, default_timeout=120)
     at.query_params["guide"] = "off"  # keep the first-run guide out of the navigation tests
-    if mode:
-        at.query_params["mode"] = mode
+    at.query_params["mode"] = mode or "Plain"  # Simple is the default; these tests cover the full lab
     at.run()
     assert not at.exception, [e.message for e in at.exception]
     return at
@@ -59,6 +58,7 @@ def test_first_run_guide_opens_and_walks_through_every_step() -> None:
     from app.guide import STEPS
 
     at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["mode"] = "Plain"  # the guide tours the full lab
     at.run()
     assert not at.exception, [e.message for e in at.exception]
     assert at.session_state["guide_active"] is True
@@ -75,6 +75,7 @@ def test_first_run_guide_opens_and_walks_through_every_step() -> None:
 
 def test_guide_can_be_skipped_and_reopened() -> None:
     at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["mode"] = "Plain"
     at.run()
     at.button(key="guide_skip").click().run()
     assert at.session_state["guide_active"] is False
@@ -302,3 +303,43 @@ def test_simple_helpers() -> None:
     assert money(-1006.4) == "−$1,006" and money(41, signed=True) == "+$41" and money(0, signed=True) == "$0"
     assert nice_strike(349.08) == 350 and nice_strike(42.4) == 42
     assert risk_level(0.06, 0.08) == "low" and risk_level(0.15, 0.12) == "medium" and risk_level(0.12, 0.34) == "high"
+
+
+def test_simple_is_the_default_for_a_plain_visit() -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert at.session_state["mode"] == "Simple"
+    assert not at.session_state.get("guide_active")
+
+
+@pytest.mark.parametrize("query, expected", [
+    ({}, "Simple"), ({"guide": "off"}, "Simple"), ({"mode": "simple"}, "Simple"),
+    ({"mode": "Plain"}, "Plain English"), ({"mode": "Plain English"}, "Plain English"), ({"mode": "pro"}, "Pro"),
+    ({"bt": "collar", "guide": "off"}, "Plain English"),  # an older share link without a mode
+    ({"K": "105"}, "Plain English"),
+])
+def test_mode_from_url(query: dict, expected: str) -> None:
+    from app.ui import mode_from_url
+
+    assert mode_from_url(query) == expected
+
+
+@pytest.mark.parametrize("page", ["pricer", "backtest"])
+def test_simple_screens_offer_a_report_and_chart_snapshots(page: str) -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["mode"] = "Simple"
+    at.session_state["_goto"] = page
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert any(getattr(w, "key", None) == "report_download" or "report" in str(w.proto).lower()
+               for w in at.get("download_button"))
+    charts = [c for c in at.get("plotly_chart")]
+    assert charts and all('"toImage"' in c.proto.spec or "toImage" in str(c.proto) for c in charts)
+
+
+def test_snapshot_names_are_safe() -> None:
+    from app.theme import snapshot_name
+
+    assert snapshot_name("AAPL", "call", "350", "1 month") == "AAPL-call-350-1-month"
+    assert snapshot_name("BRK.B", "put", "", "1/2 year?") == "BRK.B-put-1-2-year"

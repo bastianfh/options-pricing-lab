@@ -948,6 +948,35 @@ TEXT: dict[str, Entry] = {
     "simple.bt.chart.y": "Value ($)",
     "simple.bt.months": "Profit or loss each month",
     "simple.bt.note": "Estimated with model option prices and typical trading costs.",
+    "simple.report.price": "Option price",
+    "simple.report.bt": "Strategy backtest",
+    "simple.report.setup": "Your choices",
+    "simple.report.results": "Results",
+    "simple.report.stock": "Stock",
+    "simple.report.today": "Price today",
+    "simple.report.bet": "Bet",
+    "simple.report.bet.up": "Price goes up (buying a call option)",
+    "simple.report.bet.down": "Price goes down (buying a put option)",
+    "simple.report.period": "Period",
+    "simple.report.strategy": "Strategy",
+    "simple.report.profit": "Profit / loss",
+    "simple.report.col.ends": "Stock ends at",
+    "simple.report.col.change": "Change",
+    "simple.report.col.pnl": "Profit / loss",
+    "simple.report.col.month": "Month ended",
+    "simple.report.manual": "Stock price and movement entered by hand.",
+    "simple.report.how": "How it was estimated",
+    "simple.report.how.price": (
+        "The option is priced with the Black-Scholes model, using how much {ticker} moved over the past year "
+        "({vol} a year), a {rate} interest rate and a {div} dividend yield. The chance of profit is a model "
+        "estimate, not a forecast. One contract covers 100 shares."
+    ),
+    "simple.report.how.bt": (
+        "Every 30 days the strategy opens new options (strikes 5% from the price, protective wings 5% further "
+        "out), holds them to the end and starts again. Options are priced with the Black-Scholes model from the "
+        "stock's recent ups and downs plus 10%, not from real historical option prices. Costs: half of a 5% "
+        "bid-ask spread on each option, plus $0.65 per contract. Cash earns {rate} a year."
+    ),
     "simple.strat.covered_call": "Covered call · extra income from shares you own",
     "simple.strat.protective_put": "Protective put · shares with insurance",
     "simple.strat.collar": "Collar · cheap insurance, capped gains",

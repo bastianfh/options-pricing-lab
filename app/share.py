@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urlsplit
 
 import streamlit as st
 
-from app.content import PRO, SIMPLE
+from app.content import PLAIN, PRO
 
 
 def _num(lo: float, hi: float, integer: bool = False) -> Callable[[str], Any]:
@@ -244,8 +244,9 @@ def share_url(page: str, base_url: Optional[str] = None) -> str:
         params.pop("cmp", None)
     if page == "backtest" and st.session_state.get("bt_strategy") == "custom":
         params.pop("qty", None)  # custom legs already carry their quantities
-    if st.session_state.get("mode") in (PRO, SIMPLE):
-        params["mode"] = st.session_state["mode"]
+    current = st.session_state.get("mode")
+    if current in (PRO, PLAIN):  # Simple is the default and needs no parameter
+        params["mode"] = "Pro" if current == PRO else "Plain"
     params["guide"] = "off"
     base = base_url if base_url is not None else str(st.context.url or "")
     parts = urlsplit(base)

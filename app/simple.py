@@ -21,7 +21,8 @@ import streamlit as st
 
 from app.content import t
 from app.data import POPULAR, dividends_on_dates, load_history, load_risk_free
-from app.theme import palette, show, style_figure
+from app.report import Report
+from app.theme import palette, show, snapshot_name, style_figure
 from app.ui import cells, lbl, page_header, panel, panel_title, section, upper
 from marketdata import parse
 from marketdata.parse import MarketDataError, PriceHistory
@@ -97,11 +98,13 @@ def price_page() -> None:
     s.setdefault("sp_manual_price", 100.0)
     s.setdefault("sp_moves", "normal")
 
-    page_header("simple.price.title", "simple.price.lede")
+    report = Report(title=t("simple.report.price"))
+    page_header("simple.price.title", "simple.price.lede", report=report)
     left, right = st.columns([1, 2.4], gap="small")
     with left, panel("sp_inputs"):
         panel_title(t("simple.stock"))
         ticker = _ticker_picker("sp_ticker")
+        hist: PriceHistory | None = None
         try:
             with st.spinner(t("mk.loading", ticker=ticker)):
                 hist = load_history(ticker, "1y")
@@ -191,8 +194,33 @@ def price_page() -> None:
         style_figure(fig, height=340, x_title=t("simple.chart.x", ticker=ticker), y_title=t("simple.chart.y"),
                      legend=False, hovermode="closest")
         fig.update_yaxes(tickformat="$,.0f")
-        show(fig, key="sp_chart")
+        exp_name = t(f"simple.exp.{s['sp_exp']}")
+        show(fig, key="sp_chart", snapshot=snapshot_name(ticker, "call" if call else "put", f"{strike:g}", exp_name))
         st.html(f'<p class="opl-note">{t("simple.price.note", ticker=ticker)}</p>')
+
+    bet = t("simple.report.bet.up" if call else "simple.report.bet.down")
+    report.subtitle = f"{ticker}: {bet.lower()}, strike {money(strike, cents=True)}, ends in {exp_name}"
+    report.data_source = (f"{hist.source}, daily prices for {ticker} up to {hist.last_date}." if hist is not None
+                          else t("simple.report.manual"))
+    report.params(t("simple.report.setup"), {
+        t("simple.report.stock"): ticker, t("simple.report.today"): money(spot, cents=True),
+        t("simple.report.bet"): bet, t("simple.strike"): money(strike, cents=True),
+        t("simple.expiry"): exp_name, t("simple.contracts"): n,
+    })
+    report.metrics(t("simple.report.results"), [
+        (t("simple.cost"), money(cost, cents=True)), (t("simple.breakeven"), money(breakeven, cents=True)),
+        (t("simple.max_loss"), money(-cost, cents=True)),
+        (t("simple.max_gain"), t("simple.unlimited") if call else money((strike - per_share) * shares, cents=True)),
+        (t("simple.chance"), f"{100 * chance:.0f}%"),
+    ])
+    report.table(t("simple.scenarios", ticker=ticker), pd.DataFrame({
+        t("simple.report.col.ends"): [money(e, cents=True) for e in ends],
+        t("simple.report.col.change"): [pct(m) if m else "±0%" for m in SCENARIOS],
+        t("simple.report.col.pnl"): [money(v, signed=True) for v in outcomes],
+    }))
+    report.figure(t("simple.chart"), fig)
+    report.text(t("simple.report.how"), t("simple.report.how.price", ticker=ticker, vol=f"{sigma:.0%}",
+                                           rate=f"{r:.2%}", div=f"{q:.2%}"))
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +234,8 @@ def backtest_page() -> None:
     s.setdefault("sb_strategy", "covered_call")
     s.setdefault("sb_amount", 10_000)
 
-    page_header("simple.bt.title", "simple.bt.lede")
+    report = Report(title=t("simple.report.bt"))
+    page_header("simple.bt.title", "simple.bt.lede", report=report)
     left, right = st.columns([1, 2.4], gap="small")
     with left, panel("sb_inputs"):
         panel_title(t("simple.stock"))
@@ -287,7 +316,8 @@ def backtest_page() -> None:
                                  hovertemplate="$%{y:,.0f}"))
         style_figure(fig, height=340, y_title=t("simple.bt.chart.y"))
         fig.update_yaxes(tickformat="$,.0f")
-        show(fig, key="sb_chart")
+        label = hist.label if uploaded is not None else ticker
+        show(fig, key="sb_chart", snapshot=snapshot_name(label, strategy.replace("_", "-"), s["sb_period"], "value"))
 
         if result.cycles:
             section(t("simple.bt.months"))
@@ -300,5 +330,30 @@ def backtest_page() -> None:
             ))
             style_figure(bars, height=240, legend=False, hovermode="closest")
             bars.update_yaxes(tickformat="$,.0f")
-            show(bars, key="sb_months")
+            show(bars, key="sb_months", snapshot=snapshot_name(label, strategy.replace("_", "-"), s["sb_period"],
+                                                               "monthly"))
         st.html(f'<p class="opl-note">{t("simple.bt.note")}</p>')
+
+    start, end = result.dates[0].date(), result.dates[-1].date()
+    report.subtitle = f"{name} on {label}, {start} to {end}"
+    report.data_source = f"{hist.source}, daily prices and dividends for {label} up to {hist.last_date}."
+    report.params(t("simple.report.setup"), {
+        t("simple.report.stock"): label, t("simple.report.period"): f"{start} to {end}",
+        t("simple.report.strategy"): t(f"simple.strat.{strategy}"), t("simple.bt.amount"): money(amount),
+    })
+    report.metrics(t("simple.report.results"), [
+        (t("simple.bt.became", amount=money(amount)), money(value[-1])),
+        (t("simple.report.profit"), f"{money(gain, signed=True)} ({pct(mine['total_return'])})"),
+        (t("simple.bt.shares"), money(shares[-1])), (t("simple.bt.vs"), money(diff, signed=True)),
+        (t("simple.bt.per_year"), pct(mine["annual_return"])), (t("simple.bt.drop"), pct(-mine["max_drawdown"])),
+        (t("simple.bt.risk"), t(f"simple.risk.{risk}")),
+        (t("simple.bt.wins"), t("simple.bt.wins.value", wins=wins, total=len(result.cycles))),
+    ])
+    report.figure(t("simple.bt.chart"), fig)
+    if result.cycles:
+        report.figure(t("simple.bt.months"), bars)
+        report.table(t("simple.bt.months"), pd.DataFrame({
+            t("simple.report.col.month"): [c.expiry_date.date() for c in result.cycles],
+            t("simple.report.col.pnl"): [money(v, signed=True) for v in pnl],
+        }))
+    report.text(t("simple.report.how"), t("simple.report.how.bt", rate=f"{config.rate:.2%}"))
