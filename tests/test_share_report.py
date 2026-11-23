@@ -96,10 +96,43 @@ def test_report_html_contains_every_section_and_works_offline() -> None:
     for needle in ("Strategy backtest", "Covered call on KO", "Ticker", "+12.3%", "Equity curve",
                    "First 50 of 600 rows", "Line two.", "bt=covered_call", "Yahoo Finance", "How to cite"):
         assert needle in doc, needle
-    assert doc.count("Plotly.newPlot") == 1
-    # plotly.js is embedded once, not loaded from a CDN, so the report works offline.
-    assert "<script src=" not in doc and len(doc) > 1_000_000
     assert "<script>" not in r.title  # titles are escaped
+
+
+def _report_with_charts(n: int = 2) -> Report:
+    r = Report(title="Strategy backtest")
+    for i in range(n):
+        r.figure(f"Chart {i}", go.Figure(go.Scatter(x=[1, 2, 3], y=[100, 101 + i, 103])))
+    return r
+
+
+def test_report_charts_are_pictures_that_need_no_javascript(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Previews (phone file apps, email, Drive) don't run JavaScript, so charts are embedded as images."""
+    import app.report as report_module
+
+    monkeypatch.setattr(report_module, "chart_png", lambda fig: b"\x89PNG fake")
+    doc = build_html(_report_with_charts())
+    assert doc.count("data:image/png;base64,") == 2
+    assert "Plotly.newPlot" not in doc and len(doc) < 100_000  # no 4.5 MB plotly.js bundle needed
+
+
+def test_report_falls_back_to_interactive_charts_with_a_visible_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.report as report_module
+
+    monkeypatch.setattr(report_module, "chart_png", lambda fig: None)  # e.g. no Chromium on the machine
+    doc = build_html(_report_with_charts())
+    assert doc.count("Plotly.newPlot") == 2 and doc.count("This chart needs JavaScript") == 2
+    # plotly.js is embedded once, not loaded from a CDN, so the report still works offline.
+    assert "<script src=" not in doc and len(doc) > 1_000_000
+
+
+def test_kaleido_draws_real_pngs_when_a_browser_is_available() -> None:
+    from app.report import chart_png
+
+    png = chart_png(go.Figure(go.Scatter(x=[1, 2, 3], y=[1, 3, 2])))
+    if png is None:
+        pytest.skip("no headless Chromium on this machine")
+    assert png[:8] == b"\x89PNG\r\n\x1a\n" and len(png) > 5_000
 
 
 def test_report_escapes_user_text() -> None:

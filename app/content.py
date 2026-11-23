@@ -968,6 +968,7 @@ TEXT: dict[str, Entry] = {
     "simple.report.period": "Period",
     "simple.report.profit": "Profit / loss",
     "simple.report.col.month": "Month ended",
+    "simple.report.table": "Month by month",
     "simple.report.col.pnl": "Profit / loss",
     "simple.report.manual": "Stock price and movement entered by hand.",
     "simple.report.how": "How it was estimated",

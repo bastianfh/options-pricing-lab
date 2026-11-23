@@ -1,7 +1,10 @@
 """Downloadable reports: a self-contained HTML document a student can attach to a paper.
 
-The report embeds plotly.js once (about 4.5 MB), so its charts work offline and keep working
-years later, without depending on a CDN being reachable.
+Charts are embedded as pictures (PNG, drawn by Kaleido in a headless Chromium), so a report
+shows its charts anywhere: in a browser, a phone's file preview, an email attachment preview
+or a PDF printout, none of which need JavaScript. If pictures can't be made (no Chromium on the
+machine), the charts fall back to interactive plotly.js, embedded once so they still work
+offline, with a visible note to open the file in a web browser.
 
 Pages create a :class:`Report` at the top, add parameters, results, charts and tables as
 they draw them, and the "Generate report" button builds the HTML only when clicked. The
@@ -11,7 +14,10 @@ as PDF" in any browser gives a clean PDF.
 
 from __future__ import annotations
 
+import base64
 import html
+import threading
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -68,6 +74,33 @@ def _light(fig: go.Figure) -> go.Figure:
     return f
 
 
+_IMAGE_LOCK = threading.Lock()
+_IMAGES = {"server": False, "available": True}
+CHART_WIDTH, CHART_HEIGHT = 940, 360
+
+
+def chart_png(fig: go.Figure) -> Optional[bytes]:
+    """The figure as a 2x PNG, or ``None`` if no headless Chromium is available.
+
+    Keeps one Kaleido browser running between calls (the first chart takes a couple of seconds,
+    later ones well under a second) and stops trying after the first failure.
+    """
+    if not _IMAGES["available"]:
+        return None
+    try:
+        import kaleido
+
+        with _IMAGE_LOCK, warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if not _IMAGES["server"]:
+                kaleido.start_sync_server(silence_warnings=True)
+                _IMAGES["server"] = True
+            return fig.to_image(format="png", width=CHART_WIDTH, height=CHART_HEIGHT, scale=2)
+    except Exception:  # Kaleido missing, no Chromium, or the browser failed to start
+        _IMAGES["available"] = False
+        return None
+
+
 def citation(now: Optional[datetime] = None) -> str:
     """How to cite the app, dated today."""
     now = now or datetime.now(timezone.utc)
@@ -81,7 +114,7 @@ def _fmt(value: Any) -> str:
 
 
 def build_html(report: Report) -> str:
-    """Render ``report`` as a standalone HTML document (charts load plotly.js from its CDN)."""
+    """Render ``report`` as a standalone HTML document (charts as pictures, see the module docstring)."""
     now = datetime.now(timezone.utc)
     parts: list[str] = []
     first_figure = True
@@ -109,9 +142,17 @@ def build_html(report: Report) -> str:
             parts.append(f"<section><h2>{html.escape(heading)}</h2>{table}{note}</section>")
         elif kind == "figure":
             heading, fig = payload
-            div = _light(fig).to_html(full_html=False, include_plotlyjs=first_figure, config={"displaylogo": False})
-            first_figure = False
-            parts.append(f"<section class='fig'><h2>{html.escape(heading)}</h2>{div}</section>")
+            light = _light(fig)
+            png = chart_png(light)
+            if png is not None:
+                body = (f"<img class='chart' alt='{html.escape(heading)}' width='{CHART_WIDTH}' "
+                        f"src='data:image/png;base64,{base64.b64encode(png).decode()}'>")
+            else:
+                div = light.to_html(full_html=False, include_plotlyjs=first_figure, config={"displaylogo": False})
+                first_figure = False
+                body = (f"<div class='live'><p class='nojs'>This chart needs JavaScript. Open the file in a web "
+                        f"browser (Chrome, Safari, Edge or Firefox) to see it.</p>{div}</div>")
+            parts.append(f"<section class='fig'><h2>{html.escape(heading)}</h2>{body}</section>")
 
     share = (f"<p>Reproduce these results: <a href='{html.escape(report.share_link)}'>{html.escape(report.share_link)}</a></p>"
              if report.share_link else "")
@@ -144,6 +185,10 @@ def build_html(report: Report) -> str:
   .metrics b.pos {{ color: #0a7f3f; }}
   .metrics b.neg {{ color: #c62828; }}
   .note {{ color: var(--muted); font-size: 12px; }}
+  img.chart {{ display: block; width: 100%; height: auto; }}
+  .live {{ position: relative; }}
+  .live .nojs {{ position: absolute; top: 45%; left: 0; right: 0; text-align: center; color: var(--muted); margin: 0; }}
+  .live .plotly-graph-div {{ position: relative; z-index: 1; }}
   footer {{ margin-top: 2.2rem; border-top: 2px solid var(--ink); padding-top: .8rem; font-size: 12.5px; }}
   footer .cite {{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f5f6f8; padding: .6rem; }}
   a {{ color: var(--accent); word-break: break-all; }}

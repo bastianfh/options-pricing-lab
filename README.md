@@ -94,7 +94,7 @@ One thing to state in a paper: free historical option prices don't exist, so the
 
 **Optional: real market prices.** On the Payoff page, *Price from live option chain* (off by default) builds the strategy from today's real quotes for the stock loaded in Market: buying at the ask, selling at the bid, each option with its own implied volatility. Every strategy also shows its probability of profit and the market's expected move.
 
-**Generate report.** On the Pricer, Market, Backtest, Payoff and Validation pages, *Generate report* downloads a self-contained report with your inputs, results, charts, trade log, method and limitations, data source and a ready-made citation. Open it in any browser and use *Print → Save as PDF* for a clean PDF. It works offline.
+**Generate report.** On the Pricer, Market, Backtest, Payoff and Validation pages, *Generate report* downloads a self-contained report with your inputs, results, charts, trade log, method and limitations, data source and a ready-made citation. Charts are embedded as pictures, so it opens anywhere: a browser, a phone's file preview, an email attachment. Use *Print → Save as PDF* for a clean PDF. It works offline. (Streamlit Cloud installs the headless Chromium that draws the pictures from `packages.txt`; without it, reports fall back to interactive charts that need a browser.)
 
 **Share link.** *Share link* gives a URL that reopens the tool with exactly your settings (ticker, dates, strategy, assumptions), so a teacher or classmate can check or reproduce a result.
 

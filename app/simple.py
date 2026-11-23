@@ -427,8 +427,8 @@ def backtest_page() -> None:
     ])
     report.figure(t("simple.bt.became", amount=money(amount)), fig)
     if bars is not None:
-        report.figure(t("simple.bt.months"), bars)
-        report.table(t("simple.bt.months"), pd.DataFrame({
+        report.figure(t("simple.bt.months"), go.Figure(bars).update_layout(title=None, margin=dict(t=10)))
+        report.table(t("simple.report.table"), pd.DataFrame({
             t("simple.report.col.month"): [c.expiry_date.date() for c in result.cycles],
             t("simple.report.col.pnl"): [money(v, signed=True) for v in pnl],
         }))
