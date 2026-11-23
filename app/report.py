@@ -68,6 +68,12 @@ def _light(fig: go.Figure) -> go.Figure:
     return f
 
 
+def citation(now: Optional[datetime] = None) -> str:
+    """How to cite the app, dated today."""
+    now = now or datetime.now(timezone.utc)
+    return f"Options Pricing Lab (v{__version__}). {APP_URL} (source code: {REPO_URL}). Accessed {now:%d %B %Y}."
+
+
 def _fmt(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:,.6g}"
@@ -110,8 +116,7 @@ def build_html(report: Report) -> str:
     share = (f"<p>Reproduce these results: <a href='{html.escape(report.share_link)}'>{html.escape(report.share_link)}</a></p>"
              if report.share_link else "")
     source = f"<p>Data: {html.escape(report.data_source)}</p>" if report.data_source else ""
-    citation = (f"Options Pricing Lab (v{__version__}). {APP_URL} (source code: {REPO_URL}). "
-                f"Accessed {now:%d %B %Y}.")
+    cite = citation(now)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -155,7 +160,7 @@ def build_html(report: Report) -> str:
 <footer>
   {source}{share}
   <p>How to cite:</p>
-  <div class="cite">{html.escape(citation)}</div>
+  <div class="cite">{html.escape(cite)}</div>
   <p class="note">Model outputs for education and research, not investment advice. To save as PDF, use your browser's Print command.</p>
 </footer>
 </body></html>"""

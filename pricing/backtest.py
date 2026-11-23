@@ -17,6 +17,12 @@ volatility usually trades above realised). Transaction costs can be added as a b
 spread (a fraction of the option price, half paid on entry) and a commission per option.
 These are standard simplifications for teaching and should be stated in any write-up.
 
+Optional exit rules close a cycle's options early: *take profit* once their mark-to-model
+gain reaches a percentage of the premium, *stop loss* once their loss does. Closing pays
+the same half-spread and commission as opening. After an early exit the strategy waits
+(shares still held, cash still earning interest) and opens the next cycle on its usual
+schedule, so cycles stay the same length with or without exit rules.
+
 The benchmark is buying one share at the start and holding it, with dividends kept in
 cash that also earns the risk-free rate.
 """
@@ -71,6 +77,12 @@ class BacktestConfig:
         Commission per option per share (0.0065 is $0.65 per 100-share contract).
     strike_step
         Round strikes to a multiple of this (0 keeps exact strikes).
+    take_profit
+        Close the options early once their gain reaches this fraction of the net premium
+        (0.5 closes a short strangle when half the credit is earned). ``None`` disables it.
+    stop_loss
+        Close the options early once their loss reaches this fraction of the net premium
+        (2.0 closes a credit trade losing twice the credit). ``None`` disables it.
     """
 
     legs: tuple[LegTemplate, ...]
@@ -83,6 +95,8 @@ class BacktestConfig:
     spread: float = 0.0
     commission: float = 0.0
     strike_step: float = 0.0
+    take_profit: Optional[float] = None
+    stop_loss: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not self.legs:
@@ -93,11 +107,15 @@ class BacktestConfig:
             raise ValueError("vol_window must be at least 2.")
         if self.spread < 0 or self.commission < 0:
             raise ValueError("Costs cannot be negative.")
+        for rule in (self.take_profit, self.stop_loss):
+            if rule is not None and not (rule > 0 and math.isfinite(rule)):
+                raise ValueError("Exit rule levels must be positive.")
 
 
 @dataclass(frozen=True)
 class Cycle:
-    """One roll: options opened on ``open_date`` and settled on ``expiry_date``."""
+    """One roll: options opened on ``open_date``, closed on ``exit_date`` (at expiry unless an
+    exit rule fired), and the cycle ending on ``expiry_date`` when the next one opens."""
 
     open_date: pd.Timestamp
     expiry_date: pd.Timestamp
@@ -107,8 +125,10 @@ class Cycle:
     strikes: tuple[float, ...]
     premium: float  # net premium received (+) or paid (-), before costs
     costs: float
-    payoff: float  # net option payoff at expiry
+    payoff: float  # net option value received on closing (intrinsic value at expiry)
     pnl: float  # change in total portfolio value over the cycle
+    exit_date: Optional[pd.Timestamp] = None  # None means held to expiry
+    exit_reason: str = "expiry"  # "expiry", "take profit" or "stop loss"
 
 
 @dataclass(frozen=True)
@@ -139,7 +159,8 @@ class BacktestResult:
         """The roll log as a table."""
         return pd.DataFrame([
             {
-                "open": c.open_date.date(), "expiry": c.expiry_date.date(), "spot_open": c.spot_open,
+                "open": c.open_date.date(), "expiry": c.expiry_date.date(),
+                "closed": (c.exit_date or c.expiry_date).date(), "exit": c.exit_reason, "spot_open": c.spot_open,
                 "spot_expiry": c.spot_expiry, "sigma": c.sigma, "strikes": " / ".join(f"{k:g}" for k in c.strikes),
                 "premium": c.premium, "costs": c.costs, "payoff": c.payoff, "pnl": c.pnl,
             }
@@ -215,7 +236,9 @@ def run_backtest(
     s0 = p[first]
     cash = s0 - stock_qty * s0
     bench_cash = 0.0
-    open_legs: list[tuple[str, float, float]] = []  # (kind, quantity, strike)
+    open_legs: list[tuple[str, float, float]] = []  # (kind, quantity, strike) of the current cycle
+    holding = False  # options of the current cycle still open (False after an early exit)
+    exit_info: Optional[tuple] = None  # (date, reason, value received, closing costs)
     expiry_i: Optional[int] = None
     sigma = float("nan")
     cycle_open: dict = {}
@@ -227,7 +250,9 @@ def run_backtest(
     # Mark-to-model values of the open options for every day of the current cycle,
     # computed in one vectorised call per leg when the cycle opens.
     path_value = np.empty(0)
+    leg_paths: list[np.ndarray] = []
     open_i = 0
+    exits_on = config.take_profit is not None or config.stop_loss is not None
 
     for j, i in enumerate(range(first, last + 1)):
         spot = p[i]
@@ -238,22 +263,45 @@ def run_backtest(
         cash += stock_qty * d[i]
         bench_cash += d[i]
 
-        # Settle options expiring today.
-        if open_legs and i >= expiry_i:
-            payoff = float(sum(qty * max((spot - k) if kind == "call" else (k - spot), 0.0)
-                               for kind, qty, k in open_legs))
-            cash += payoff
+        # Exit rules: close the options early at their model value (before expiry day).
+        if exits_on and holding and open_i < i < expiry_i:
+            entry_value = path_value[0]
+            basis = abs(entry_value)
+            gain = path_value[i - open_i] - entry_value
+            reason = None
+            if basis > 1e-12:
+                if config.take_profit is not None and gain >= config.take_profit * basis:
+                    reason = "take profit"
+                elif config.stop_loss is not None and gain <= -config.stop_loss * basis:
+                    reason = "stop loss"
+            if reason is not None:
+                received = float(path_value[i - open_i])
+                close_costs = float(sum(abs(qty) * (0.5 * config.spread * float(lp[i - open_i]) + config.commission)
+                                        for (_, qty, _), lp in zip(open_legs, leg_paths)))
+                cash += received - close_costs
+                holding = False
+                exit_info = (idx[i], reason, received, close_costs)
+
+        # Settle options expiring today (or end a cycle that was closed early).
+        if expiry_i is not None and i >= expiry_i:
+            if holding:
+                payoff = float(sum(qty * max((spot - k) if kind == "call" else (k - spot), 0.0)
+                                   for kind, qty, k in open_legs))
+                cash += payoff
+                exit_date, reason, extra_costs = None, "expiry", 0.0
+            else:
+                exit_date, reason, payoff, extra_costs = exit_info
             value_now = cash + stock_qty * spot
             cycles.append(Cycle(
                 open_date=idx[cycle_open["i"]], expiry_date=idx[i], spot_open=cycle_open["spot"], spot_expiry=spot,
                 sigma=cycle_open["sigma"], strikes=tuple(k for _, _, k in open_legs),
-                premium=cycle_open["premium"], costs=cycle_open["costs"], payoff=payoff,
-                pnl=value_now - cycle_open["value_before"],
+                premium=cycle_open["premium"], costs=cycle_open["costs"] + extra_costs, payoff=payoff,
+                pnl=value_now - cycle_open["value_before"], exit_date=exit_date, exit_reason=reason,
             ))
-            open_legs, expiry_i = [], None
+            open_legs, expiry_i, holding, exit_info = [], None, False, None
 
         # Open the next cycle, if its expiry falls inside the data.
-        if option_legs and not open_legs and i < last:
+        if option_legs and expiry_i is None and i < last:
             target = idx[i] + pd.Timedelta(days=config.tenor_days)
             e = int(idx.searchsorted(target))
             if e <= last:
@@ -271,11 +319,15 @@ def run_backtest(
                 expiry_i, open_i = e, i
                 taus = (idx[e] - idx[i:e + 1]).days.to_numpy(dtype=float) / 365.0
                 path_value = np.zeros(e - i + 1)
+                leg_paths = []
                 for kind, qty, k in open_legs:
-                    path_value += qty * np.asarray(black_scholes_price(p[i:e + 1], k, taus, r, sigma, q, kind))
+                    leg_path = np.asarray(black_scholes_price(p[i:e + 1], k, taus, r, sigma, q, kind), dtype=float)
+                    leg_paths.append(leg_path)
+                    path_value += qty * leg_path
+                holding = True
                 cycle_open = dict(i=i, spot=spot, sigma=sigma, premium=premium, costs=costs, value_before=value_before)
 
-        values[j] = cash + stock_qty * spot + (path_value[i - open_i] if open_legs else 0.0)
+        values[j] = cash + stock_qty * spot + (path_value[i - open_i] if holding else 0.0)
         bench[j] = spot + bench_cash
 
     return BacktestResult(idx[first:last + 1], values, bench, cycles)

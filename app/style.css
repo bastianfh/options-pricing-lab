@@ -244,6 +244,32 @@ a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 
   .opl-grid > .opl-readout { grid-column: 1 / -1; }
   .opl-grid > .opl-greek:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .opl-readout .v { font-size: 24px; }
+
+  /* Compact top bar: wordmark, guide, feedback and mode on one row; tools on a swipeable row below.
+     (Streamlit wraps each element in a container div, so the flex items are matched with :has().) */
+  .st-key-topbar { gap: 0.35rem 0.4rem !important; }
+  .st-key-topbar > div:has(.opl-telemetry), .st-key-topbar > div:has([data-testid="stSpace"]) { display: none !important; }
+  .st-key-topbar > div { width: auto !important; flex: 0 0 auto !important; min-width: 0; }
+  .st-key-topbar > div:has(.opl-wordmark) { flex: 1 1 auto !important; }
+  .st-key-topbar > div:has(.st-key-topnav) { order: 10; flex: 1 1 100% !important; width: 100% !important;
+    overflow-x: auto; scrollbar-width: none; }
+  .st-key-topbar > div:has(.st-key-topnav)::-webkit-scrollbar { display: none; }
+  .st-key-topnav, .st-key-topnav > div { width: max-content !important; }
+  .st-key-topnav [data-testid="stButtonGroup"] > div, .st-key-topnav [data-baseweb="button-group"] {
+    flex-wrap: nowrap !important; width: max-content !important; max-width: none !important; }
+  .st-key-topnav [data-testid="stElementContainer"], .st-key-topnav [data-testid="stButtonGroup"] { width: max-content !important; }
+  .st-key-topnav button { flex: 0 0 auto !important; min-width: max-content !important; }
+  .st-key-topbar .opl-wordmark { padding-right: 0; }
+  .st-key-guide_btn button, .st-key-topbar [data-testid="stLinkButton"] a { padding: 0 0.15rem !important; }
+  .st-key-topmode button { padding: 0 0.4rem !important; }
+
+  /* Charts: no floating toolbar over the legend, and a swipe scrolls the page instead of zooming the chart. */
+  .modebar-container { display: none !important; }
+  .js-plotly-plot .draglayer, .js-plotly-plot .nsewdrag { pointer-events: none !important; }
+
+  /* Page header: title and description stacked, actions full width. */
+  .opl-context { flex-direction: column; gap: 0.25rem; }
+  .opl-cmp-row span { flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
@@ -315,3 +341,15 @@ a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 
 .st-key-guide_buttons { margin-top: 0.4rem; }
 .st-key-guide_btn button { font-family: var(--mono) !important; font-size: 10.5px !important; letter-spacing: 0.08em; color: var(--label) !important; }
 .st-key-guide_btn button:hover { color: var(--accent) !important; }
+.st-key-topbar [data-testid="stLinkButton"] a { font-family: var(--mono) !important; font-size: 10.5px !important;
+  letter-spacing: 0.08em; color: var(--label) !important; white-space: nowrap; padding: 0 0.3rem !important;
+  min-height: 26px; text-decoration: none; background: transparent !important; border: 0 !important; }
+.st-key-topbar [data-testid="stLinkButton"] a p { font-size: 10.5px !important; }
+.st-key-topbar [data-testid="stLinkButton"] a:hover { color: var(--accent) !important; }
+
+/* ---------- backtest comparison list ---------- */
+.opl-cmp-row { display: flex; align-items: baseline; gap: 0.6rem; font-family: var(--mono); font-size: 12px;
+  min-width: 0; flex-wrap: wrap; }
+.opl-cmp-row i { display: inline-block; width: 10px; height: 10px; flex: none; transform: translateY(1px); }
+.opl-cmp-row b { color: var(--ink); font-weight: 600; }
+.opl-cmp-row span { color: var(--label); font-size: 11px; letter-spacing: 0.04em; }

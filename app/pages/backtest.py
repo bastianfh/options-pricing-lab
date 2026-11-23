@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import math
 from datetime import date
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,8 @@ import streamlit as st
 
 from app.content import t
 from app.data import POPULAR, dividends_on_dates, load_history, load_risk_free
-from app.report import Report
+from app.report import APP_URL, Report, citation
+from app.share import MAX_COMPARE, clean_name, decode_compare, encode_compare
 from app.theme import palette, show, style_figure
 from app.ui import cells, explain, finish_page, is_pro, lbl, page_header, panel, panel_title, section, tx, upper
 from marketdata import parse
@@ -35,11 +37,13 @@ from pricing.backtest import (
     template_legs,
     upside_exposure,
 )
+from pricing import __version__
 from pricing.historical import rolling_volatility
 
 PERIODS = ["1y", "2y", "5y", "10y"]
 TENORS = [7, 14, 21, 30, 45, 60, 90, 120, 180]
 USES_CALL = {"covered_call", "collar", "long_strangle", "bull_call_spread", "iron_condor"}
+COMPARE_COLOURS = ("#FF5500", "#4DA3FF", "#C77DFF", "#F4F4F6")  # neutral of gain/loss/vol meanings
 USES_PUT = {"protective_put", "collar", "cash_secured_put", "long_strangle", "bear_put_spread", "iron_condor"}
 STRATEGY_OPTIONS = (*TEMPLATE_NAMES, "custom")
 SIDES = ("buy", "sell")
@@ -50,12 +54,13 @@ s.setdefault("bt_ticker", s.get("mk_applied", ("AAPL", "2y"))[0])
 s.setdefault("bt_period", "5y")
 s.setdefault("bt_applied", (s["bt_ticker"], s["bt_period"]))
 DEFAULTS = dict(bt_strategy="covered_call", bt_tenor=30, bt_otm_call=5.0, bt_otm_put=5.0, bt_wing=5.0,
-                bt_window=21, bt_vol_premium=10.0, bt_spread=5.0, bt_commission=0.65, bt_strike_step=1.0)
+                bt_window=21, bt_vol_premium=10.0, bt_spread=5.0, bt_commission=0.65, bt_strike_step=1.0,
+                bt_exits=False, bt_tp=50.0, bt_sl=200.0, bt_view="single")
 for key, value in DEFAULTS.items():
     s.setdefault(key, value)
 # Inputs that are only drawn for some strategies: re-assigning keeps their values while hidden
 # (Streamlit otherwise drops the state of widgets that weren't drawn on the last run).
-for key in ("bt_otm_call", "bt_otm_put", "bt_wing", "bt_name", *(k for k in list(s.keys()) if str(k).startswith("bt_qty_"))):
+for key in ("bt_otm_call", "bt_otm_put", "bt_wing", "bt_name", "bt_exits", "bt_tp", "bt_sl", *(k for k in list(s.keys()) if str(k).startswith("bt_qty_"))):
     if key in s:
         s[key] = s[key]
 
@@ -146,6 +151,125 @@ def _frame_legs(frame: pd.DataFrame) -> list[LegTemplate]:
     return legs
 
 
+def _strategy_name(strategy: str) -> str:
+    if strategy == "custom":
+        return clean_name(s.get("bt_name") or "") or t("bt.custom.default_name")
+    name = tx(f"bt.strategy.{strategy}")
+    sizes = _sizes(strategy)
+    if any(x != 1 for x in sizes):
+        name += f" ({':'.join(f'{x:g}' for x in sizes)})"
+    return name
+
+
+def _exit_levels() -> tuple[Optional[float], Optional[float]]:
+    """Take-profit and stop-loss levels as fractions of the premium (``None`` when off)."""
+    if not s.get("bt_exits") or s.get("bt_strategy") == "buy_and_hold":
+        return None, None
+    tp, sl = float(s.get("bt_tp") or 0), float(s.get("bt_sl") or 0)
+    return (tp / 100 if tp > 0 else None), (sl / 100 if sl > 0 else None)
+
+
+def _compare_entries() -> list[dict]:
+    try:
+        return decode_compare(s.get("bt_cmp") or "")
+    except (ValueError, TypeError):
+        return []
+
+
+def _add_to_compare() -> None:
+    entries = _compare_entries()
+    code = s.get("bt_legs") if s["bt_strategy"] == "custom" else _template_code(s["bt_strategy"])
+    if not code:
+        return
+    tp, sl = _exit_levels()
+    entry = dict(legs=code, tenor=int(s["bt_tenor"]), tp=tp, sl=sl, name=_strategy_name(s["bt_strategy"]))
+    same = [e for e in entries if (e["legs"], e["tenor"], e["tp"], e["sl"]) == (code, entry["tenor"], tp, sl)]
+    if same:
+        st.toast(t("bt.cmp.duplicate"))
+    elif len(entries) >= MAX_COMPARE:
+        st.toast(t("bt.cmp.full"))
+    else:
+        entries.append(entry)
+        s["bt_cmp"] = encode_compare(entries)
+        st.toast(t("bt.cmp.added", name=entry["name"], n=len(entries)))
+
+
+def _remove_compare(i: int) -> None:
+    entries = _compare_entries()
+    if 0 <= i < len(entries):
+        entries.pop(i)
+    if entries:
+        s["bt_cmp"] = encode_compare(entries)
+    else:
+        s.pop("bt_cmp", None)
+
+
+def _clear_compare() -> None:
+    s.pop("bt_cmp", None)
+
+
+def _where(m: float) -> str:
+    """A strike multiple in words: 'at the price', '5% above the price'."""
+    gap = round(100 * (m - 1), 2)
+    if abs(gap) < 1e-9:
+        return "at the price"
+    return f"{abs(gap):g}% {'above' if gap > 0 else 'below'} the price"
+
+
+def describe_legs(legs, short: bool = False) -> str:
+    """'buy 1 share, sell 1 call 5% above the price', or 'BUY 1 SH · SELL 1 C 105%' when short."""
+    out = []
+    for leg in legs:
+        side, n = ("buy" if leg.quantity > 0 else "sell"), abs(leg.quantity)
+        if short:
+            what = "SH" if leg.kind == "stock" else f"{leg.kind[0].upper()} {round(100 * leg.moneyness, 2):g}%"
+            out.append(f"{side.upper()} {n:g} {what}")
+        elif leg.kind == "stock":
+            out.append(f"{side} {n:g} share{'s' if n != 1 else ''}")
+        else:
+            out.append(f"{side} {n:g} {leg.kind}{'s' if n != 1 else ''} {_where(leg.moneyness)}")
+    return (" · " if short else ", ").join(out)
+
+
+def _exit_phrase(tp: Optional[float], sl: Optional[float]) -> str:
+    parts = []
+    if tp is not None:
+        parts.append(f"once the options had gained {100 * tp:g}% of the premium (take profit)")
+    if sl is not None:
+        parts.append(f"once they had lost {100 * sl:g}% of it (stop loss)")
+    return "" if not parts else ", or closed early " + " or ".join(parts)
+
+
+def paper_panel(hist: PriceHistory, dates: pd.DatetimeIndex, runs: list[tuple[str, BacktestConfig]]) -> None:
+    """'For your paper': a methods paragraph built from the current settings, a checklist and the citation."""
+    cfg = runs[0][1]
+    divs = " and dividends" if float(np.sum(dividends_on_dates(hist))) > 0 else ""
+    text = [f"Data: daily closing prices{divs} for {hist.label} from {dates[0].date()} to {dates[-1].date()} "
+            f"(source: {hist.source})."]
+    for name, c in runs:
+        held = "held to expiry" if any(leg.kind != "stock" for leg in c.legs) else "held throughout"
+        rolled = f", opened every {c.tenor_days} calendar days and {held}" if held == "held to expiry" else f", {held}"
+        text.append(f"{name}: {describe_legs(c.legs)}{rolled}{_exit_phrase(c.take_profit, c.stop_loss)}.")
+    step = "exact strikes" if cfg.strike_step == 0 else f"strikes rounded to the nearest ${cfg.strike_step:g}"
+    text.append(
+        "Option prices are model prices, not historical quotes: each option is priced with the Black-Scholes model "
+        f"using the stock's trailing {cfg.vol_window}-day realised volatility multiplied by {1 + cfg.vol_premium:.2f} "
+        "(to approximate the premium implied volatility usually carries over realised volatility, with a 5% "
+        f"minimum), a {cfg.rate:.2%} risk-free rate and a {cfg.dividend_yield:.2%} dividend yield, with {step}."
+    )
+    text.append(f"Trading costs: half of a {cfg.spread:.1%} bid-ask spread on every option traded, plus "
+                f"${100 * cfg.commission:.2f} commission per contract.")
+    text.append("The benchmark is buying one share at the start and holding it, with dividends kept in cash earning "
+                "the risk-free rate.")
+    text.append(f"Backtests were run in Options Pricing Lab (v{__version__}), {APP_URL}.")
+    with st.expander(upper(tx("bt.paper"))):
+        st.caption(t("bt.paper.method"))
+        st.code(" ".join(text), language=None, wrap_lines=True)
+        st.markdown(f"**{t('bt.paper.checklist_title')}**")
+        st.markdown(t("bt.paper.checklist"))
+        st.code(citation(), language=None, wrap_lines=True)
+
+
 if "bt_rate" not in s:  # default to today's 13-week T-bill rate, before the input is drawn
     _rf0 = load_risk_free()
     s["bt_rate"] = round(100 * _rf0, 2) if _rf0 is not None else 4.0
@@ -232,6 +356,17 @@ with left, panel("bt_inputs"):
             with size_cols[i % 2]:
                 st.number_input(upper(f"{side} {t(f'bt.custom.kind.{leg.kind}')}"), 0.5, MAX_QUANTITY, step=0.5,
                                 format="%g", key=_size_key(strategy, i), help=tx("bt.sizes.help"))
+    if strategy != "buy_and_hold":
+        st.html('<div style="height:0.6rem"></div>')
+        panel_title(tx("bt.exits"))
+        st.toggle(lbl("bt.exits.toggle"), key="bt_exits", help=tx("bt.exits.help"))
+        if s["bt_exits"]:
+            tp_col, sl_col = st.columns(2, gap="small")
+            with tp_col:
+                st.number_input(lbl("bt.tp"), 0.0, 1000.0, step=10.0, format="%.0f", key="bt_tp", help=tx("bt.tp.help"))
+            with sl_col:
+                st.number_input(lbl("bt.sl"), 0.0, 1000.0, step=25.0, format="%.0f", key="bt_sl", help=tx("bt.sl.help"))
+            st.caption(t("bt.exits.note"))
 
     with st.expander(upper(tx("bt.assumptions")), expanded=is_pro()):
         st.segmented_control(lbl("bt.window"), [21, 63, 126], format_func=lambda w: f"{w}D", key="bt_window",
@@ -246,6 +381,150 @@ with left, panel("bt_inputs"):
         st.segmented_control(lbl("bt.strike_step"), [0.0, 0.5, 1.0, 2.5, 5.0],
                              format_func=lambda v: upper(t("bt.exact")) if v == 0 else f"${v:g}", key="bt_strike_step",
                              required=True, help=tx("bt.strike_step.help"), width="stretch")
+
+def _fmt_pct(x: float, digits: int = 1) -> str:
+    return "–" if x is None or not math.isfinite(x) else f"{100 * x:+.{digits}f}%".replace("-", "−")
+
+
+def _signed_colour(v: float) -> str:
+    """Table cell colour: green for a gain, red for a loss."""
+    if not isinstance(v, (int, float)) or v == 0 or not math.isfinite(v):
+        return ""
+    pal = palette()
+    return f"color: {pal.positive if v > 0 else pal.negative}"
+
+
+def render_comparison(entries: list[dict], hist: PriceHistory, window: tuple, base: dict, divs: np.ndarray,
+                      report: Report) -> None:
+    """Up to four strategies on the same stock, dates and assumptions: list, table, overlaid charts, report."""
+    p = palette()
+    report.title = t("bt.cmp.report_title")
+    if not entries:
+        st.info(t("bt.cmp.empty"))
+        return
+    section(tx("bt.cmp.title"))
+    runs = []
+    for i, e in enumerate(entries):
+        colour = COMPARE_COLOURS[i % len(COMPARE_COLOURS)]
+        exits = (t("bt.cmp.exits", tp=f"{100 * e['tp']:g}%" if e["tp"] else t("bt.cmp.off"),
+                   sl=f"{100 * e['sl']:g}%" if e["sl"] else t("bt.cmp.off")) if (e["tp"] or e["sl"]) else "")
+        legs = legs_from_code(e["legs"])
+        meta = " · ".join(x for x in (describe_legs(legs, short=True), upper(t("bt.cmp.rolls", tenor=e["tenor"])),
+                                      exits) if x)
+        with st.container(horizontal=True, gap="small", vertical_alignment="center", key=f"bt_cmp_row_{i}"):
+            st.html(f'<div class="opl-cmp-row"><i style="background:{colour}"></i><b>{html.escape(e["name"])}</b>'
+                    f'<span>{html.escape(meta)}</span></div>')
+            st.button(upper(t("bt.cmp.remove")), key=f"bt_cmp_rm_{i}", on_click=_remove_compare, args=(i,),
+                      type="tertiary")
+        try:
+            cfg = BacktestConfig(legs=legs, tenor_days=e["tenor"], take_profit=e["tp"], stop_loss=e["sl"], **base)
+            res = run_backtest(hist.dates, hist.close, cfg, dividends=divs, start=pd.Timestamp(window[0]),
+                               end=pd.Timestamp(window[1]))
+        except ValueError as exc:
+            st.warning(t("bt.cmp.error", name=e["name"], error=exc))
+            continue
+        runs.append((e, cfg, res, colour))
+    st.button(upper(t("bt.cmp.clear")), key="bt_cmp_clear", on_click=_clear_compare, type="tertiary")
+    if not runs:
+        return
+
+    first = runs[0][2]
+    bench = performance(first.benchmark, first.dates, base["rate"])
+    bh_name = t("bt.bh_long", ticker=hist.label)
+    rows = []
+    for e, cfg, res, _ in runs:
+        perf = performance(res.value, res.dates, base["rate"])
+        rows.append({
+            "strategy": e["name"], "total": 100 * perf["total_return"], "annual": 100 * perf["annual_return"],
+            "vol": 100 * perf["annual_volatility"], "sharpe": perf["sharpe"], "dd": -100 * perf["max_drawdown"],
+            "win": 100 * res.win_rate if res.cycles else float("nan"), "premium": res.total_premium,
+            "costs": res.total_costs, "early": sum(c.exit_reason != "expiry" for c in res.cycles),
+        })
+    rows.append({"strategy": bh_name, "total": 100 * bench["total_return"], "annual": 100 * bench["annual_return"],
+                 "vol": 100 * bench["annual_volatility"], "sharpe": bench["sharpe"], "dd": -100 * bench["max_drawdown"],
+                 "win": float("nan"), "premium": 0.0, "costs": 0.0, "early": 0})
+    frame = pd.DataFrame(rows)
+
+    section(tx("bt.cmp.table"))
+    styled = (frame.style.map(_signed_colour, subset=["total", "annual", "sharpe", "premium"])
+              .map(lambda v: f"color: {p.negative}" if isinstance(v, float) and v < 0 else "", subset=["dd"])
+              .format("{:.0f}", na_rep="–", subset=["win"]))
+    st.dataframe(styled, hide_index=True, width="stretch", column_config={
+        "strategy": st.column_config.TextColumn(t("bt.cmp.col.strategy"), pinned=True),
+        "total": st.column_config.NumberColumn(t("bt.cmp.col.total"), format="%+.1f"),
+        "annual": st.column_config.NumberColumn(t("bt.cmp.col.annual"), format="%+.1f"),
+        "vol": st.column_config.NumberColumn(t("bt.cmp.col.vol"), format="%.1f"),
+        "sharpe": st.column_config.NumberColumn(t("bt.cmp.col.sharpe"), format="%.2f"),
+        "dd": st.column_config.NumberColumn(t("bt.cmp.col.dd"), format="%.1f"),
+        "win": st.column_config.NumberColumn(t("bt.cmp.col.win"), format="%.0f"),
+        "premium": st.column_config.NumberColumn(t("bt.cmp.col.premium"), format="%+.2f"),
+        "costs": st.column_config.NumberColumn(t("bt.cmp.col.costs"), format="%.2f"),
+        "early": st.column_config.NumberColumn(t("bt.cmp.col.early"), format="%d"),
+    })
+    strategies = frame.iloc[:-1]
+    best_ret = strategies.loc[strategies["total"].idxmax()]
+    finite_sharpe = strategies.dropna(subset=["sharpe"])
+    best_sharpe = finite_sharpe.loc[finite_sharpe["sharpe"].idxmax()] if len(finite_sharpe) else None
+    finite_dd = strategies.dropna(subset=["dd"])
+    best_dd = finite_dd.loc[finite_dd["dd"].idxmax()] if len(finite_dd) else None
+    explain(t("bt.cmp.best", ret_name=best_ret["strategy"], ret=f"{best_ret['total']:+.1f}%".replace("-", "−"),
+              sharpe_name=best_sharpe["strategy"] if best_sharpe is not None else "–",
+              sharpe=f"{best_sharpe['sharpe']:.2f}" if best_sharpe is not None else "–",
+              dd_name=best_dd["strategy"] if best_dd is not None else "–",
+              dd=f"{best_dd['dd']:.1f}%".replace("-", "−") if best_dd is not None else "–"))
+    st.html(f'<p class="opl-note">{html.escape(t("bt.caveat"))}</p>')
+
+    section(tx("bt.equity"))
+    fig_eq = go.Figure()
+    fig_eq.add_trace(go.Scatter(x=first.dates, y=100 * first.benchmark / first.benchmark[0], name=bh_name,
+                                line=dict(color=p.label, width=1.4, dash="dash"), hovertemplate="%{y:.1f}"))
+    for e, _, res, colour in runs:
+        fig_eq.add_trace(go.Scatter(x=res.dates, y=100 * res.value / res.value[0], name=e["name"],
+                                    line=dict(color=colour, width=1.8), hovertemplate="%{y:.1f}"))
+    style_figure(fig_eq, height=360, y_title=tx("bt.equity.y"))
+    show(fig_eq, key="bt_cmp_equity")
+
+    section(tx("bt.drawdown_chart"))
+    fig_dd = go.Figure()
+    fig_dd.add_trace(go.Scatter(x=first.dates, y=100 * (first.benchmark / np.maximum.accumulate(first.benchmark) - 1),
+                                name=bh_name, line=dict(color=p.label, width=1.2, dash="dash"), hovertemplate="%{y:.1f}%"))
+    for e, _, res, colour in runs:
+        fig_dd.add_trace(go.Scatter(x=res.dates, y=100 * (res.value / np.maximum.accumulate(res.value) - 1),
+                                    name=e["name"], line=dict(color=colour, width=1.4), hovertemplate="%{y:.1f}%"))
+    style_figure(fig_dd, height=280, y_title=tx("bt.drawdown.y"))
+    show(fig_dd, key="bt_cmp_drawdown")
+
+    paper_panel(hist, first.dates, [(e["name"], cfg) for e, cfg, _, _ in runs])
+
+    daily = pd.DataFrame({"date": first.dates.date, "buy_and_hold": first.benchmark,
+                          **{e["name"]: res.value for e, _, res, _ in runs}})
+    st.download_button(upper(t("bt.cmp.download")), daily.to_csv(index=False), f"comparison-{hist.label}-daily.csv",
+                       "text/csv", key="bt_cmp_dl", on_click="ignore")
+
+    report.subtitle = f"{len(runs)} strategies on {hist.label}, {first.dates[0].date()} to {first.dates[-1].date()}"
+    report.data_source = f"{hist.source}, daily closes and dividends for {hist.label} up to {hist.last_date}."
+    cfg0 = runs[0][1]
+    report.params(t("bt.report.setup"), {
+        "Underlying": hist.label, "Period": f"{first.dates[0].date()} to {first.dates[-1].date()}",
+        "Volatility": f"trailing {cfg0.vol_window}-day realised, x{1 + cfg0.vol_premium:.2f}",
+        "Risk-free rate": f"{cfg0.rate:.2%}", "Dividend yield (pricing)": f"{cfg0.dividend_yield:.2%}",
+        "Bid-ask spread": f"{cfg0.spread:.1%} of option price (half paid per trade)",
+        "Commission": f"${100 * cfg0.commission:.2f} per contract",
+        "Strike rounding": "exact" if cfg0.strike_step == 0 else f"${cfg0.strike_step:g}",
+    })
+    report.table("Strategies", pd.DataFrame([{
+        "Strategy": e["name"], "Legs": describe_legs(cfg.legs), "Roll every (days)": cfg.tenor_days,
+        "Take profit": f"{100 * cfg.take_profit:g}% of premium" if cfg.take_profit else "off",
+        "Stop loss": f"{100 * cfg.stop_loss:g}% of premium" if cfg.stop_loss else "off",
+    } for e, cfg, _, _ in runs]))
+    report.table(t("bt.cmp.table.pro"), frame.rename(columns={
+        "strategy": "Strategy", "total": "Total return %", "annual": "Annual return %", "vol": "Volatility %",
+        "sharpe": "Sharpe", "dd": "Max drawdown %", "win": "Win rate %", "premium": "Net premium $",
+        "costs": "Costs $", "early": "Closed early"}))
+    report.figure(t("bt.equity.pro"), fig_eq)
+    report.figure(t("bt.drawdown_chart.pro"), fig_dd)
+    report.text(t("bt.report.method"), t("bt.report.method_body"))
+
 
 # --------------------------------------------------------------------------- data
 hist: PriceHistory | None = None
@@ -264,9 +543,17 @@ elif uploaded is not None:
         error = str(exc)
 
 with right:
+    entries = _compare_entries()
+    with st.container(horizontal=True, gap="small", vertical_alignment="center", key="bt_viewbar"):
+        view = st.segmented_control(
+            lbl("bt.view.single"), ["single", "compare"], key="bt_view", required=True, label_visibility="collapsed",
+            format_func=lambda v: upper(tx(f"bt.view.{v}", n=len(entries))),
+        )
+        st.button(upper(t("bt.cmp.add")), key="bt_cmp_add", on_click=_add_to_compare, help=tx("bt.cmp.add.help"),
+                  disabled=len(entries) >= MAX_COMPARE or (strategy == "custom" and not custom_legs))
     if error:
         st.error(error)
-    if strategy == "custom" and not custom_legs:
+    if view == "single" and strategy == "custom" and not custom_legs:
         st.info(t("bt.custom.empty"))
         st.stop()
     if hist is None:
@@ -289,11 +576,7 @@ with right:
         s["bt_qty"] = sizes_to_code(sizes)
     else:
         s.pop("bt_qty", None)
-    config = BacktestConfig(
-        legs=tuple(custom_legs) if strategy == "custom"
-        else sized_legs(template_legs(strategy, s["bt_otm_call"] / 100, s["bt_otm_put"] / 100, s["bt_wing"] / 100),
-                        sizes),
-        tenor_days=int(s["bt_tenor"]),
+    base = dict(
         vol_window=int(s["bt_window"]),
         vol_premium=float(s["bt_vol_premium"]) / 100,
         rate=float(s["bt_rate"]) / 100,
@@ -302,8 +585,24 @@ with right:
         commission=float(s["bt_commission"]) / 100,  # dollars per contract -> per share
         strike_step=float(s["bt_strike_step"]),
     )
+    divs = dividends_on_dates(hist).to_numpy()
+    if view == "compare":
+        render_comparison(entries, hist, window, base, divs, report)
+        finish_page(actions)
+        st.stop()
+
+    take_profit, stop_loss = _exit_levels()
+    config = BacktestConfig(
+        legs=tuple(custom_legs) if strategy == "custom"
+        else sized_legs(template_legs(strategy, s["bt_otm_call"] / 100, s["bt_otm_put"] / 100, s["bt_wing"] / 100),
+                        sizes),
+        tenor_days=int(s["bt_tenor"]),
+        take_profit=take_profit,
+        stop_loss=stop_loss,
+        **base,
+    )
     try:
-        result = run_backtest(hist.dates, hist.close, config, dividends=dividends_on_dates(hist).to_numpy(),
+        result = run_backtest(hist.dates, hist.close, config, dividends=divs,
                               start=pd.Timestamp(window[0]), end=pd.Timestamp(window[1]))
     except ValueError as exc:
         st.warning(str(exc))
@@ -312,12 +611,7 @@ with right:
     stats = performance(result.value, result.dates, config.rate)
     bench = performance(result.benchmark, result.dates, config.rate)
     p = palette()
-    if strategy == "custom":
-        strat_name = " ".join(str(s.get("bt_name") or "").split()) or t("bt.custom.default_name")
-    else:
-        strat_name = tx(f"bt.strategy.{strategy}")
-        if any(x != 1 for x in sizes):
-            strat_name += f" ({':'.join(f'{x:g}' for x in sizes)})"
+    strat_name = _strategy_name(strategy)
 
     def pct(x: float, digits: int = 1) -> str:
         return "–" if x is None or not math.isfinite(x) else f"{100 * x:+.{digits}f}%".replace("-", "−")
@@ -358,6 +652,12 @@ with right:
                verdict=t("bt.verdict.better") if better else t("bt.verdict.worse"),
                dd=pct(-stats["max_drawdown"]), bhdd=pct(-bench["max_drawdown"])))
     st.html(f'<p class="opl-note">{html.escape(t("bt.caveat"))}</p>')
+    exits_on = take_profit is not None or stop_loss is not None
+    if exits_on and result.cycles:
+        reasons = [c.exit_reason for c in result.cycles]
+        explain(t("bt.exits.summary", early=sum(r != "expiry" for r in reasons), total=len(reasons),
+                  tp=reasons.count("take profit"), sl=reasons.count("stop loss")))
+    paper_panel(hist, result.dates, [(strat_name, config)])
     if upside_exposure(config.legs) < 0:
         st.warning(t("bt.custom.unlimited"))
     if np.min(result.value) <= 0:
@@ -413,6 +713,11 @@ with right:
 
     # --------------------------------------------------------------- cycles
     log = result.cycles_frame()
+    if len(log):
+        if exits_on:
+            log["exit"] = [t(f"bt.exit.{r}") for r in log["exit"]]
+        else:
+            log = log.drop(columns=["closed", "exit"])
     fig_cy = None
     if len(log):
         section(tx("bt.cycle_chart"), tx("bt.cycle_chart.lede"))
@@ -425,17 +730,12 @@ with right:
         show(fig_cy, key="bt_cycle_chart")
 
         section(tx("bt.log"))
-        pal = palette()
-
-        def signed_colour(v: float) -> str:
-            if not isinstance(v, (int, float)) or v == 0 or not math.isfinite(v):
-                return ""
-            return f"color: {pal.positive if v > 0 else pal.negative}"
-
-        styled = log.style.map(signed_colour, subset=["premium", "payoff", "pnl"])
+        styled = log.style.map(_signed_colour, subset=["premium", "payoff", "pnl"])
         st.dataframe(styled, hide_index=True, width="stretch", height=280, column_config={
             "open": st.column_config.DateColumn(t("bt.col.open")),
             "expiry": st.column_config.DateColumn(t("bt.col.expiry")),
+            "closed": st.column_config.DateColumn(t("bt.col.closed")),
+            "exit": st.column_config.TextColumn(t("bt.col.exit")),
             "spot_open": st.column_config.NumberColumn(t("bt.col.spot_open"), format="%.2f"),
             "spot_expiry": st.column_config.NumberColumn(t("bt.col.spot_expiry"), format="%.2f"),
             "sigma": st.column_config.NumberColumn(t("bt.col.sigma"), format="%.3f"),
@@ -467,6 +767,9 @@ with right:
         "Bid-ask spread": f"{config.spread:.1%} of option price (half paid per trade)",
         "Commission": f"${100 * config.commission:.2f} per contract",
         "Strike rounding": "exact" if config.strike_step == 0 else f"${config.strike_step:g}",
+        "Exit rules": "none (held to expiry)" if not exits_on else ", ".join(x for x in (
+            f"take profit at {100 * take_profit:g}% of premium" if take_profit else "",
+            f"stop loss at {100 * stop_loss:g}% of premium" if stop_loss else "") if x),
     })
     report.metrics(t("bt.report.results"), [
         (f"{t('bt.total_return.pro')}", pct(stats["total_return"])), (f"{t('bt.bh_short')} total", pct(bench["total_return"])),

@@ -75,6 +75,10 @@ Live data comes from Yahoo Finance through the `yfinance` package: it's free but
 
 **Backtest a strategy.** Pick a stock, a strategy (covered call, protective put, collar, cash-secured put, straddle, strangle, bull/bear spreads, iron condor) and how often to roll it. You can change how many of each leg you trade (say 2 calls and 1 put on a straddle, or sell 2 calls against 1 in a ratio spread). Or pick **Build your own** and put together up to 8 legs (buy or sell shares, calls and puts, with strikes as a % of the price). You can start from any ready-made strategy and tweak it, and a payoff chart shows what one period looks like so you can check you built what you meant. The app replays it over up to 10 years of real prices and shows the equity curve against buy-and-hold, drawdowns, profit or loss per cycle, a full trade log, and return, volatility, Sharpe ratio, max drawdown and win rate. Costs (bid-ask spread and commission) and a volatility premium are adjustable.
 
+- **Exit rules (optional, off by default).** Close the options early at a profit target or a stop loss, both set as a % of the premium (e.g. take profit at 50%, stop at 200%). The trade log shows which periods closed early and why.
+- **Compare up to 4 strategies.** Press *+ Add to comparison* for each strategy you want, then switch to *Compare*. They're all tested on the same stock, dates and costs, with one table, overlaid equity and drawdown charts, and a line saying which did best on return, risk-adjusted return and worst fall. The report and share link include the whole comparison.
+- **For your paper.** A ready-made methods paragraph built from your exact settings, a checklist of what to include, and the citation, all with copy buttons.
+
 One thing to state in a paper: free historical option prices don't exist, so the backtest prices each option with Black-Scholes using the stock's recent realised volatility. The app says this on the page and in every report.
 
 ![Backtest of a covered call](docs/images/backtest-pro-dark.png)
@@ -100,6 +104,15 @@ Black-Scholes gives an exact answer for simple options, so I can check the other
 The Validation page in the app has the full charts and tables.
 
 There are also **420 automated tests**. They check textbook examples from Hull and Haug, basic rules like put-call parity, that each method gets close to Black-Scholes, and that every page of the app loads and switches correctly in both modes. They run automatically on GitHub every time I push code.
+
+## Using it with a class
+
+- It works on phones: panels stack, the tool tabs swipe sideways, and swiping over a chart scrolls the page instead of zooming.
+- **[!] Feedback** in the top bar opens a new GitHub issue by default. To send students to a Google Form instead, add this to the app's secrets (on Streamlit Cloud: *Manage app → Settings → Secrets*):
+
+  ```toml
+  feedback_url = "https://forms.gle/your-form"
+  ```
 
 ## Run it on your own computer
 

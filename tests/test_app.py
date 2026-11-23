@@ -183,3 +183,64 @@ def test_shared_link_sizes_apply_to_the_linked_strategy() -> None:
     assert not at.exception, [e.message for e in at.exception]
     assert at.session_state["bt_qty_bull_call_spread_1"] == 2.0
     assert any("no limit" in w.value for w in at.warning)  # a 1x2 call spread is short a naked call
+
+
+def test_backtest_exit_rules_are_off_by_default_and_work_when_enabled() -> None:
+    at = _start(None)
+    at.session_state["bt_strategy"] = "iron_condor"
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception and at.session_state["bt_exits"] is False
+    assert not [n for n in at.number_input if n.key in ("bt_tp", "bt_sl")]  # hidden until switched on
+
+    at = _start("Pro")
+    at.session_state["bt_strategy"] = "iron_condor"
+    at.session_state["bt_exits"] = True
+    at.session_state["bt_tp"] = 50.0
+    at.session_state["bt_sl"] = 200.0
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    assert any("closed early" in str(h.proto) for h in at.get("html"))  # the exit summary line
+
+
+COMPARE = "s+1,c-1@105~30~0~0~Covered call|s+1,p+1@95,c-1@105~30~0~0~Collar|p+1@90,p-1@95,c-1@105,c+1@110~30~0.5~2~Condor"
+
+
+@pytest.mark.parametrize("mode", [None, "Pro"])
+def test_backtest_compare_view_runs_every_strategy(mode: str | None) -> None:
+    at = _start(mode)
+    at.session_state["bt_cmp"] = COMPARE
+    at.session_state["bt_view"] = "compare"
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    table = next(df for df in at.dataframe if "strategy" in df.value.columns)
+    assert list(table.value["strategy"])[:3] == ["Covered call", "Collar", "Condor"]
+    assert len(table.value) == 4  # plus buy & hold
+
+
+def test_backtest_compare_view_without_strategies_explains_what_to_do() -> None:
+    at = _start(None)
+    at.session_state["bt_view"] = "compare"
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception
+    assert any("Nothing to compare yet" in i.value for i in at.info)
+
+
+def test_feedback_link_is_in_the_top_bar() -> None:
+    at = _start(None)
+    assert not at.exception
+    from app.ui import DEFAULT_FEEDBACK_URL, feedback_url
+
+    assert feedback_url() == DEFAULT_FEEDBACK_URL
+
+
+def test_feedback_link_can_point_at_a_form(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.ui import feedback_url
+
+    monkeypatch.setenv("OPL_FEEDBACK_URL", "https://forms.gle/example")
+    assert feedback_url() == "https://forms.gle/example"
+    monkeypatch.setenv("OPL_FEEDBACK_URL", "javascript:alert(1)")
+    assert feedback_url().startswith("https://github.com/")

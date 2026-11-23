@@ -203,3 +203,74 @@ def test_sizes_round_trip() -> None:
     assert sizes_to_code(sizes_from_code("2, 1.5")) == "2,1.5"
     with pytest.raises(ValueError):
         sized_legs(template_legs("long_straddle"), (1,))
+
+
+# --------------------------------------------------------------------------- exit rules
+
+def _strangle(**kw) -> BacktestConfig:
+    """A short strangle: sell a call 5% above and a put 5% below, a classic credit trade for exit rules."""
+    short = tuple(LegTemplate(leg.kind, -leg.quantity, leg.moneyness) for leg in template_legs("long_strangle"))
+    return BacktestConfig(short, tenor_days=45, rate=0.03, **kw)
+
+
+def test_take_profit_closes_once_the_target_share_of_the_credit_is_earned() -> None:
+    dates, p = market(n=900, seed=7)
+    res = run_backtest(dates, p, _strangle(take_profit=0.5))
+    hits = [c for c in res.cycles if c.exit_reason == "take profit"]
+    assert hits, "expected some take-profit exits"
+    for c in hits:
+        assert c.premium > 0  # a short strangle collects a credit
+        assert c.premium + c.payoff >= 0.5 * c.premium - 1e-9  # gain on the options when closed
+        assert c.open_date < c.exit_date < c.expiry_date
+    assert all(c.exit_date is None for c in res.cycles if c.exit_reason == "expiry")
+
+
+def test_stop_loss_closes_once_the_loss_reaches_its_limit() -> None:
+    dates, p = market(n=900, seed=11, sigma=0.45)
+    res = run_backtest(dates, p, _strangle(stop_loss=1.0))
+    hits = [c for c in res.cycles if c.exit_reason == "stop loss"]
+    assert hits, "expected some stop-loss exits"
+    for c in hits:
+        assert c.premium + c.payoff <= -1.0 * c.premium + 1e-9
+
+
+def test_after_an_early_exit_the_cash_just_earns_interest_until_the_next_roll() -> None:
+    dates, p = market(n=900, seed=7)
+    res = run_backtest(dates, p, _strangle(take_profit=0.3))
+    c = next(c for c in res.cycles if c.exit_reason == "take profit")
+    idle = (res.dates > c.exit_date) & (res.dates <= c.expiry_date)
+    v = res.value[(res.dates >= c.exit_date) & (res.dates <= c.expiry_date)]
+    d = res.dates[(res.dates >= c.exit_date) & (res.dates <= c.expiry_date)]
+    assert idle.sum() > 0
+    days = pd.Series(d).diff().dt.days.to_numpy()[1:]
+    np.testing.assert_allclose(np.diff(np.log(v)), 0.03 * days / 365.0, atol=1e-12)
+
+
+def test_exit_rules_that_never_trigger_change_nothing() -> None:
+    dates, p = market()
+    base = run_backtest(dates, p, _strangle())
+    wide = run_backtest(dates, p, _strangle(take_profit=1e6, stop_loss=1e6))
+    np.testing.assert_array_equal(base.value, wide.value)
+
+
+def test_without_costs_an_early_exit_does_not_jump_the_portfolio_value() -> None:
+    dates, p = market(n=900, seed=7)
+    base = run_backtest(dates, p, _strangle())
+    tp = run_backtest(dates, p, _strangle(take_profit=0.5))
+    first = next(c for c in tp.cycles if c.exit_reason == "take profit")
+    upto = tp.dates <= first.exit_date
+    np.testing.assert_allclose(tp.value[upto], base.value[upto], rtol=1e-12)
+
+
+def test_closing_early_pays_costs_again() -> None:
+    dates, p = market(n=900, seed=7)
+    res = run_backtest(dates, p, _strangle(take_profit=0.5, spread=0.1, commission=0.01))
+    closed = [c for c in res.cycles if c.exit_reason == "take profit"]
+    assert closed
+    assert all(c.costs > 4 * 0.01 for c in closed)  # two legs' commission on opening, and again on closing
+
+
+@pytest.mark.parametrize("kw", [dict(take_profit=0), dict(stop_loss=-1), dict(take_profit=float("inf"))])
+def test_exit_rule_levels_must_be_positive(kw: dict) -> None:
+    with pytest.raises(ValueError):
+        BacktestConfig(template_legs("covered_call"), **kw)

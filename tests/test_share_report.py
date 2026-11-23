@@ -128,3 +128,16 @@ def test_custom_backtest_link_carries_its_legs() -> None:
             del st.session_state[key]
     assert query["bt"] == ["custom"] and query["legs"] == ["s+1,c-1@105"] and query["name"] == ["My collar"]
     assert "legs" not in plain and "name" not in plain
+
+
+def test_comparison_lists_round_trip_and_reject_bad_input() -> None:
+    from app.share import decode_compare, encode_compare
+
+    entries = decode_compare("s+1,c-1@105~30~0~0~Covered call|c-1@105,p-1@95~45~0.5~2~Short strangle")
+    assert entries[1] == dict(legs="c-1@105,p-1@95", tenor=45, tp=0.5, sl=2.0, name="Short strangle")
+    assert entries[0]["tp"] is None and entries[0]["sl"] is None
+    assert decode_compare(encode_compare(entries)) == entries
+    for bad in ["s+1~30~0~0", "x+1~30~0~0~A", "s+1~0~0~0~A", "s+1~30~-1~0~A", "|".join(["s+1~30~0~0~A"] * 5)]:
+        with pytest.raises((ValueError, TypeError)):
+            decode_compare(bad)
+    assert encode_compare([dict(legs="s+1", tenor=30, tp=None, sl=None, name="A|B~C")]) == "s+1~30~0~0~A B C"

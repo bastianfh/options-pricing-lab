@@ -116,6 +116,22 @@ def _sync_mode_param() -> None:
         del st.query_params["mode"]
 
 
+DEFAULT_FEEDBACK_URL = "https://github.com/bastianfh/options-pricing-lab/issues/new"
+
+
+def feedback_url() -> str:
+    """Where the FEEDBACK link goes: ``feedback_url`` in Streamlit secrets or the OPL_FEEDBACK_URL environment
+    variable (for example a Google Form), otherwise a new GitHub issue."""
+    import os
+
+    try:
+        url = str(st.secrets.get("feedback_url", "") or "")
+    except Exception:  # no secrets file at all
+        url = ""
+    url = url or os.environ.get("OPL_FEEDBACK_URL", "")
+    return url if url.startswith(("https://", "http://")) else DEFAULT_FEEDBACK_URL
+
+
 def render_topbar(current: str) -> None:
     """Telemetry bar: wordmark, mechanical tool tabs, live parameter readout, status LED, Plain/Pro switch."""
     s = st.session_state
@@ -155,6 +171,8 @@ def render_topbar(current: str) -> None:
             help=t("guide.button.help"),
             type="tertiary",
         )
+        st.link_button(f"[!] {upper(t('feedback.button'))}", feedback_url(), help=t("feedback.button.help"),
+                       type="tertiary")
         with st.container(key="topmode", width="content"):
             st.segmented_control(
                 upper(t("mode.label")),

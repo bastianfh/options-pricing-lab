@@ -58,6 +58,43 @@ def _sizes(v: str) -> str:
     return sizes_to_code(sizes_from_code(v))
 
 
+MAX_COMPARE = 4
+
+
+def clean_name(v: str) -> str:
+    """A strategy name safe to show and to put in a link (no separators, at most 40 characters)."""
+    return " ".join(str(v).replace("~", " ").replace("|", " ").split())[:40]
+
+
+def encode_compare(entries: list[dict]) -> str:
+    """Comparison list -> link text: ``legs~tenor~take_profit~stop_loss~name`` joined by ``|``."""
+    return "|".join(
+        f"{e['legs']}~{int(e['tenor'])}~{float(e.get('tp') or 0):g}~{float(e.get('sl') or 0):g}~{clean_name(e['name'])}"
+        for e in entries
+    )
+
+
+def decode_compare(text: str) -> list[dict]:
+    """Inverse of :func:`encode_compare`; raises ``ValueError`` on anything malformed."""
+    from pricing.backtest import legs_from_code, legs_to_code
+
+    entries = []
+    for part in [x for x in str(text).split("|") if x]:
+        legs, tenor, tp, sl, name = part.split("~", 4)
+        tenor_i, tp_f, sl_f = int(tenor), float(tp), float(sl)
+        if not (1 <= tenor_i <= 365) or not (0 <= tp_f <= 10) or not (0 <= sl_f <= 10):
+            raise ValueError
+        entries.append(dict(legs=legs_to_code(legs_from_code(legs)), tenor=tenor_i, tp=tp_f or None,
+                            sl=sl_f or None, name=clean_name(name) or "Strategy"))
+    if len(entries) > MAX_COMPARE:
+        raise ValueError
+    return entries
+
+
+def _compare(v: str) -> str:
+    return encode_compare(decode_compare(v))
+
+
 def _name(v: str) -> str:
     v = " ".join(v.split())
     if not v or len(v) > 40 or not v.isprintable():
@@ -119,6 +156,11 @@ PAGE_PARAMS: dict[str, tuple[Param, ...]] = {
         Param("qty", "bt_qty", _sizes),
         Param("name", "bt_name", _name),
         Param("tenor", "bt_tenor", _num(7, 180, integer=True)),
+        Param("exits", "bt_exits", _bool),
+        Param("tp", "bt_tp", _num(0, 1000)),
+        Param("sl", "bt_sl", _num(0, 1000)),
+        Param("view", "bt_view", _choice("single", "compare")),
+        Param("cmp", "bt_cmp", _compare),
         Param("otm_c", "bt_otm_call", _num(0, 50)),
         Param("otm_p", "bt_otm_put", _num(0, 50)),
         Param("wing", "bt_wing", _num(0, 50)),
@@ -195,6 +237,11 @@ def share_url(page: str, base_url: Optional[str] = None) -> str:
     if page == "backtest" and st.session_state.get("bt_strategy") != "custom":
         params.pop("legs", None)  # only custom strategies need their legs spelled out
         params.pop("name", None)
+    if page == "backtest" and not st.session_state.get("bt_exits"):
+        params.pop("tp", None)
+        params.pop("sl", None)
+    if page == "backtest" and not st.session_state.get("bt_cmp"):
+        params.pop("cmp", None)
     if page == "backtest" and st.session_state.get("bt_strategy") == "custom":
         params.pop("qty", None)  # custom legs already carry their quantities
     if st.session_state.get("mode") == PRO:

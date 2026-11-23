@@ -875,6 +875,8 @@ TEXT: dict[str, Entry] = {
     "vs.market.note": "Market quotes for {ticker} on {date}: {n} out-of-the-money options across {k} expiries.",
 
     # -------------------------------------------------------------- backtest
+    "feedback.button": "Feedback",
+    "feedback.button.help": "Found a bug or something confusing? Tell me here (opens in a new tab).",
     "bt.title": {"plain": "How would it have done?", "pro": "Backtest"},
     "bt.lede": {
         "plain": "Replay an option strategy on a real stock's history and compare it with simply owning the shares.",
@@ -989,6 +991,85 @@ TEXT: dict[str, Entry] = {
         "How many of this leg to trade, per share of stock (1 = one option on one share; a contract covers 100). "
         "Uneven sizes change the bet: 2 calls with 1 put makes a straddle lean towards a rise, 1 call with 2 puts "
         "leans towards a fall. Buying more than 1 share borrows the extra at the interest rate."
+    ),
+    "bt.exits": {"plain": "When to close early", "pro": "Exit rules"},
+    "bt.exits.toggle": {"plain": "Use exit rules (optional)", "pro": "Enable exit rules"},
+    "bt.exits.help": (
+        "Off by default: the options are held until they expire. Turn this on to close them early once they've "
+        "made or lost a set share of the premium, like many traders do. After closing, the strategy waits for "
+        "its next regular roll date before opening new options."
+    ),
+    "bt.tp": {"plain": "Take profit (%)", "pro": "Take profit [%]"},
+    "bt.tp.help": (
+        "Close once the options have gained this much, as a percentage of the premium. If you were paid a "
+        "premium (selling options), 50 means close when they can be bought back for half. If you paid one, "
+        "50 means close when they're worth 1.5 times what you paid. 0 turns it off."
+    ),
+    "bt.sl": {"plain": "Stop loss (%)", "pro": "Stop loss [%]"},
+    "bt.sl.help": (
+        "Close once the options have lost this much, as a percentage of the premium. 200 on a trade that was "
+        "paid $1 closes it when it's down $2. If you paid for the options, the most they can lose is 100%, "
+        "so higher values never trigger. 0 turns it off."
+    ),
+    "bt.exits.note": "Both are a % of the premium; 0 turns one off. Closing early pays the spread and commission again.",
+    "bt.exits.summary": "{early} of {total} periods closed early: {tp} at the profit target, {sl} at the stop loss.",
+    "bt.exit.expiry": "expiry",
+    "bt.exit.take profit": "take profit",
+    "bt.exit.stop loss": "stop loss",
+    "bt.col.closed": "Closed",
+    "bt.col.exit": "Exit",
+    "bt.view.single": {"plain": "This strategy", "pro": "Single"},
+    "bt.view.compare": {"plain": "Compare ({n}/4)", "pro": "Compare ({n}/4)"},
+    "bt.cmp.add": "+ Add to comparison",
+    "bt.cmp.add.help": (
+        "Saves the strategy on the left (legs, roll period and exit rules) so you can compare up to 4 side by side. "
+        "All of them are tested on the same stock, dates and cost assumptions."
+    ),
+    "bt.cmp.added": "Added {name} to the comparison ({n}/4).",
+    "bt.cmp.duplicate": "That strategy is already in the comparison.",
+    "bt.cmp.full": "The comparison already has 4 strategies. Remove one first.",
+    "bt.cmp.empty": (
+        "Nothing to compare yet. Set up a strategy on the left and press + ADD TO COMPARISON, then change it "
+        "and add another (up to 4)."
+    ),
+    "bt.cmp.title": {"plain": "Strategies in the comparison", "pro": "Comparison set"},
+    "bt.cmp.remove": "Remove",
+    "bt.cmp.clear": "Clear all",
+    "bt.cmp.rolls": "every {tenor}d",
+    "bt.cmp.exits": "TP {tp} / SL {sl}",
+    "bt.cmp.off": "off",
+    "bt.cmp.table": {"plain": "Side by side", "pro": "Performance comparison"},
+    "bt.cmp.table.pro": "Performance comparison",
+    "bt.cmp.col.strategy": "Strategy",
+    "bt.cmp.col.total": "Total return %",
+    "bt.cmp.col.annual": "Per year %",
+    "bt.cmp.col.vol": "Volatility %",
+    "bt.cmp.col.sharpe": "Sharpe",
+    "bt.cmp.col.dd": "Max drawdown %",
+    "bt.cmp.col.win": "Win rate %",
+    "bt.cmp.col.premium": "Net premium $",
+    "bt.cmp.col.costs": "Costs $",
+    "bt.cmp.col.early": "Closed early",
+    "bt.cmp.best": (
+        "Highest total return: {ret_name} ({ret}). Best return per unit of risk: {sharpe_name} (Sharpe {sharpe}). "
+        "Smallest worst fall: {dd_name} ({dd})."
+    ),
+    "bt.cmp.error": "{name} couldn't be tested on this data: {error}",
+    "bt.cmp.report_title": "Strategy comparison",
+    "bt.cmp.download": "Download daily values of all (CSV)",
+    "bt.paper": {"plain": "For your paper", "pro": "Writing it up"},
+    "bt.paper.method": "A methods paragraph you can adapt (copy button at the top right):",
+    "bt.paper.checklist_title": "What to include",
+    "bt.paper.checklist": (
+        "- The stock, the dates and where the prices came from.\n"
+        "- Every leg of the strategy, how often it's rolled, and any exit rules.\n"
+        "- That option prices come from Black-Scholes and the stock's recent volatility, not real historical "
+        "quotes, and what that leaves out (the volatility smile, jumps around earnings, early assignment).\n"
+        "- The trading costs you assumed.\n"
+        "- Risk next to return: volatility, Sharpe ratio and worst fall from a peak, compared with buy and hold. "
+        "Return on its own can make a risky strategy look good.\n"
+        "- The report (GENERATE REPORT) or the SHARE LINK in an appendix, so your results can be checked.\n"
+        "- A citation for the tool:"
     ),
     "bt.assumptions": {"plain": "Assumptions", "pro": "Model and cost assumptions"},
     "bt.window": {"plain": "Movement measured over", "pro": "Realised-vol window"},
