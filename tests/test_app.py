@@ -244,3 +244,61 @@ def test_feedback_link_can_point_at_a_form(monkeypatch: pytest.MonkeyPatch) -> N
     assert feedback_url() == "https://forms.gle/example"
     monkeypatch.setenv("OPL_FEEDBACK_URL", "javascript:alert(1)")
     assert feedback_url().startswith("https://github.com/")
+
+
+# --------------------------------------------------------------------------- Simple mode
+
+@pytest.mark.parametrize("direction", ["up", "down"])
+def test_simple_price_screen_shows_the_essentials(direction: str) -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["mode"] = "Simple"
+    at.session_state["sp_dir"] = direction
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    html_text = " ".join(str(h.proto) for h in at.get("html"))
+    for label in ("COST", "BREAK-EVEN", "MOST YOU CAN LOSE", "MOST YOU CAN MAKE", "CHANCE OF PROFIT"):
+        assert label in html_text
+    assert ("UNLIMITED" in html_text) == (direction == "up")
+    assert at.session_state["nav_tool"] == "pricer"
+    assert not at.session_state.get("guide_active")  # the full-lab guide stays out of Simple mode
+
+
+@pytest.mark.parametrize("strategy", ["covered_call", "iron_condor", "long_straddle"])
+def test_simple_backtest_screen_runs(strategy: str) -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["mode"] = "Simple"
+    at.session_state["sb_strategy"] = strategy
+    at.session_state["_goto"] = "backtest"
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    html_text = " ".join(str(h.proto) for h in at.get("html"))
+    for label in ("YOUR $10,000 BECAME", "JUST OWNING THE SHARES", "BIGGEST DROP", "RISK", "WINNING MONTHS"):
+        assert label in html_text
+
+
+def test_simple_mode_only_offers_the_two_simple_tools() -> None:
+    at = AppTest.from_file(APP, default_timeout=120)
+    at.query_params["mode"] = "Simple"
+    at.query_params["guide"] = "off"
+    at.session_state["_goto"] = "greeks"  # an advanced tool: Simple mode sends you back to the price screen
+    at.run()
+    assert not at.exception, [e.message for e in at.exception]
+    nav = next(w for w in at.get("button_group") if w.key == "nav_tool")
+    assert list(nav.proto.options) and len(nav.proto.options) == 2
+    assert at.session_state["nav_tool"] == "pricer"
+
+
+def test_simple_wording_falls_back_to_plain_english() -> None:
+    from app.content import PLAIN, PRO, SIMPLE, t
+
+    assert t("navshort.pricer", SIMPLE) == "Option price"
+    assert t("navshort.pricer", PLAIN) == t("navshort.pricer", PRO) == "Pricer"
+    assert t("bt.total_return", SIMPLE) == t("bt.total_return", PLAIN)
+
+
+def test_simple_helpers() -> None:
+    from app.simple import money, nice_strike, risk_level
+
+    assert money(-1006.4) == "−$1,006" and money(41, signed=True) == "+$41" and money(0, signed=True) == "$0"
+    assert nice_strike(349.08) == 350 and nice_strike(42.4) == 42
+    assert risk_level(0.06, 0.08) == "low" and risk_level(0.15, 0.12) == "medium" and risk_level(0.12, 0.34) == "high"

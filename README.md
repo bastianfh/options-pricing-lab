@@ -28,7 +28,15 @@ New here? A short **guide** opens on your first visit and walks you through wher
 
 ![The first-run guide highlighting the input panel](docs/images/guide.png)
 
-There's a **Plain English / Pro** switch in the top bar. Plain English explains everything in everyday words; Pro shows the proper notation and extra detail. To open the app straight in Pro mode, add [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
+There's a **Simple / Plain English / Pro** switch in the top bar.
+
+- **Simple** is for complete beginners. It cuts the app down to two screens with no jargon:
+  - **Option price:** pick a stock, pick "price goes up" or "price goes down", a strike and when it ends. You see the cost, break-even, the most you can lose and make, the chance of profit, what happens if the stock moves ±10–20%, and a profit/loss chart.
+  - **Backtest:** pick a stock, a strategy and a starting amount. You see what it became next to just owning the shares, the biggest drop, a low/medium/high risk level and how many months won. Volatility, rates and costs are filled in for you.
+- **Plain English** explains everything in everyday words.
+- **Pro** shows the proper notation and extra detail.
+
+To open the app straight in a mode, add [`?mode=Simple`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Simple) or [`?mode=Pro`](https://options-pricing-lab-bastianfh.streamlit.app/?mode=Pro) to the link.
 
 ## The app's pages
 

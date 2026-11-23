@@ -15,7 +15,7 @@ from typing import Callable, Optional
 
 import streamlit as st
 
-from app.content import CURRENCY_SYMBOLS, FX_PAIRS, PLAIN, PRO, t
+from app.content import CURRENCY_SYMBOLS, FX_PAIRS, MODES, PLAIN, PRO, SIMPLE, t
 from pricing.engine import NumericalSettings, OptionSpec
 
 REPO_URL = "https://github.com/bastianfh/options-pricing-lab"
@@ -26,12 +26,17 @@ DAYS_PER_YEAR = 365.0
 # ---------------------------------------------------------------------------
 
 def mode() -> str:
-    """Current explanation mode: ``PLAIN`` or ``PRO``."""
-    return PRO if st.session_state.get("mode") == PRO else PLAIN
+    """Current explanation mode: ``SIMPLE``, ``PLAIN`` or ``PRO``."""
+    current = st.session_state.get("mode")
+    return current if current in MODES else PLAIN
 
 
 def is_pro() -> bool:
     return mode() == PRO
+
+
+def is_simple() -> bool:
+    return mode() == SIMPLE
 
 
 def tx(key: str, **fmt: object) -> str:
@@ -83,6 +88,11 @@ def reset_module_index() -> None:
 
 
 NAV_ORDER = ["pricer", "market", "backtest", "greeks", "payoff", "surface", "validation", "methods"]
+SIMPLE_NAV = ["pricer", "backtest"]  # Simple mode shows only these tools, each as a stripped-down screen
+
+
+def nav_order() -> list[str]:
+    return SIMPLE_NAV if is_simple() else NAV_ORDER
 
 
 def _on_nav() -> None:
@@ -101,19 +111,25 @@ def init_mode() -> None:
     """
     if "mode" not in st.session_state:
         requested = str(st.query_params.get("mode", "")).strip().lower()
-        st.session_state["mode"] = PRO if requested == "pro" else PLAIN
+        st.session_state["mode"] = {"pro": PRO, "simple": SIMPLE}.get(requested, PLAIN)
 
 
-def _mode_query_params() -> dict[str, str]:
-    return {"mode": PRO} if st.session_state.get("mode") == PRO else {}
+def mode_query_params() -> dict[str, str]:
+    return {"mode": mode()} if mode() != PLAIN else {}
 
 
 def _sync_mode_param() -> None:
-    """Keep ``?mode=Pro`` in the address bar so the current view can be shared."""
-    if st.session_state.get("mode") == PRO:
-        st.query_params["mode"] = PRO
+    """Keep ``?mode=Pro`` / ``?mode=Simple`` in the address bar so the current view can be shared."""
+    if mode() != PLAIN:
+        st.query_params["mode"] = mode()
     elif "mode" in st.query_params:
         del st.query_params["mode"]
+
+
+def _on_mode_change() -> None:
+    _sync_mode_param()
+    if is_simple() and st.session_state.get("nav_tool") not in SIMPLE_NAV:
+        st.session_state["_goto"] = "pricer"  # the advanced tools have no Simple version
 
 
 DEFAULT_FEEDBACK_URL = "https://github.com/bastianfh/options-pricing-lab/issues/new"
@@ -144,42 +160,45 @@ def render_topbar(current: str) -> None:
     with st.container(horizontal=True, key="topbar", vertical_alignment="center", gap="small"):
         st.html('<div class="opl-wordmark">OPL<b>/</b>LAB</div>')
         with st.container(key="topnav", width="content"):
+            order = nav_order()
             st.segmented_control(
                 "Tool",
-                options=NAV_ORDER,
-                format_func=lambda k: f"[{NAV_ORDER.index(k) + 1:02d}] {upper(t(f'navshort.{k}'))}",
+                options=order,
+                format_func=lambda k: f"[{order.index(k) + 1:02d}] {upper(tx(f'navshort.{k}'))}",
                 key="nav_tool",
                 required=True,
                 on_change=_on_nav,
                 label_visibility="collapsed",
             )
-        st.html(
-            '<div class="opl-telemetry">'
-            f"<span>MODEL <b>{model}</b></span>"
-            f"<span>r <b>{float(s.get('in_r', 0)):.2f}%</b></span>"
-            f"<span class=\"opt\">σ <b>{float(s.get('in_vol', 0)):.1f}%</b></span>"
-            f"<span class=\"opt\">T <b>{int(s.get('in_days', 0))}d</b></span>"
-            + (f"<span>DATA <b>{html.escape(str(s['mk_sent']))}</b></span>" if s.get("mk_sent") else "")
-            + '<span><i class="opl-led"></i><b>LIVE</b></span>'
-            "</div>"
-        )
+        if not is_simple():  # the telemetry and the guide describe the full lab
+            st.html(
+                '<div class="opl-telemetry">'
+                f"<span>MODEL <b>{model}</b></span>"
+                f"<span>r <b>{float(s.get('in_r', 0)):.2f}%</b></span>"
+                f"<span class=\"opt\">σ <b>{float(s.get('in_vol', 0)):.1f}%</b></span>"
+                f"<span class=\"opt\">T <b>{int(s.get('in_days', 0))}d</b></span>"
+                + (f"<span>DATA <b>{html.escape(str(s['mk_sent']))}</b></span>" if s.get("mk_sent") else "")
+                + '<span><i class="opl-led"></i><b>LIVE</b></span>'
+                "</div>"
+            )
         st.space("stretch")
-        st.button(
-            f"[?] {upper(t('guide.button'))}",
-            key="guide_btn",
-            on_click=guide.start,
-            help=t("guide.button.help"),
-            type="tertiary",
-        )
+        if not is_simple():
+            st.button(
+                f"[?] {upper(t('guide.button'))}",
+                key="guide_btn",
+                on_click=guide.start,
+                help=t("guide.button.help"),
+                type="tertiary",
+            )
         st.link_button(f"[!] {upper(t('feedback.button'))}", feedback_url(), help=t("feedback.button.help"),
                        type="tertiary")
         with st.container(key="topmode", width="content"):
             st.segmented_control(
                 upper(t("mode.label")),
-                options=[PLAIN, PRO],
+                options=list(MODES),
                 key="mode",
                 required=True,
-                on_change=_sync_mode_param,
+                on_change=_on_mode_change,
                 help=t("mode.help"),
                 label_visibility="collapsed",
                 persist_state="session",
@@ -670,7 +689,7 @@ def handle_navigation(pages: dict[str, st.Page]) -> None:
     """Follow a pending page switch requested by a callback (callbacks cannot switch pages)."""
     target = st.session_state.pop("_goto", None)
     if target and target in pages:
-        st.switch_page(pages[target], query_params=_mode_query_params() or None)
+        st.switch_page(pages[target], query_params=mode_query_params() or None)
 
 
 def cached(fn: Callable) -> Callable:

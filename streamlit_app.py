@@ -19,7 +19,17 @@ import streamlit as st
 from app import guide
 from app.content import t
 from app.share import apply_shared_settings
-from app.ui import handle_navigation, init_mode, init_state, inject_css, render_topbar, reset_module_index
+from app.ui import (
+    SIMPLE_NAV,
+    handle_navigation,
+    init_mode,
+    init_state,
+    inject_css,
+    is_simple,
+    mode_query_params,
+    render_topbar,
+    reset_module_index,
+)
 
 st.set_page_config(page_title=t("app.name"), layout="wide", initial_sidebar_state="collapsed")
 
@@ -40,6 +50,8 @@ apply_shared_settings()  # a shared link's settings override the defaults, once 
 navigation = st.navigation(list(PAGES.values()), position="hidden")
 handle_navigation(PAGES)
 current = next(key for key, page in PAGES.items() if page.title == navigation.title)
+if is_simple() and current not in SIMPLE_NAV:  # e.g. a link to /greeks opened in Simple mode
+    st.switch_page(PAGES["pricer"], query_params=mode_query_params())
 inject_css()
 reset_module_index()
 guide.maybe_auto_open(current)

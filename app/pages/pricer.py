@@ -35,6 +35,12 @@ from pricing.greeks import GREEK_NAMES
 from pricing.models.black_scholes import black_scholes_price, d1_d2
 from pricing.utils import ExerciseStyle, OptionType
 
+if st.session_state.get("mode") == "Simple":  # beginners get a stripped-down screen (app/simple.py)
+    from app.simple import price_page
+
+    price_page()
+    st.stop()
+
 report = Report(title=t("pricer.report_title"))
 actions = page_header("pricer.title", "pricer.lede", page="pricer", report=report)
 

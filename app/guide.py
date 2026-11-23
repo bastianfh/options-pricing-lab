@@ -74,6 +74,8 @@ def maybe_auto_open(current: str) -> None:
     """Open the guide automatically on a first visit to the Pricer (once per session)."""
     if st.session_state.get("guide_checked"):
         return
+    if st.session_state.get("mode") == "Simple":  # the guide tours the full lab, not the Simple screens
+        return
     st.session_state["guide_checked"] = True
     flag = str(st.query_params.get("guide", "")).strip().lower()
     if flag == "off":

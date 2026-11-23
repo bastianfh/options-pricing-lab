@@ -353,3 +353,12 @@ a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 
 .opl-cmp-row i { display: inline-block; width: 10px; height: 10px; flex: none; transform: translateY(1px); }
 .opl-cmp-row b { color: var(--ink); font-weight: 600; }
 .opl-cmp-row span { color: var(--label); font-size: 11px; letter-spacing: 0.04em; }
+
+/* ---------- Simple mode ---------- */
+.opl-simple-grid .opl-cell .v { font-size: 22px; }
+.opl-simple-hero .opl-cell .v { font-size: 30px; }
+@media (max-width: 760px) {
+  .opl-simple-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .opl-simple-hero { grid-template-columns: minmax(0, 1fr) !important; }
+  .opl-simple-grid > .opl-cell:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}

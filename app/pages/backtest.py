@@ -40,6 +40,12 @@ from pricing.backtest import (
 from pricing import __version__
 from pricing.historical import rolling_volatility
 
+if st.session_state.get("mode") == "Simple":  # beginners get a stripped-down screen (app/simple.py)
+    from app.simple import backtest_page
+
+    backtest_page()
+    st.stop()
+
 PERIODS = ["1y", "2y", "5y", "10y"]
 TENORS = [7, 14, 21, 30, 45, 60, 90, 120, 180]
 USES_CALL = {"covered_call", "collar", "long_strangle", "bull_call_spread", "iron_condor"}

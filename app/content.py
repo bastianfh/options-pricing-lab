@@ -18,8 +18,8 @@ from typing import Union
 
 Entry = Union[str, dict[str, str]]
 
-PLAIN, PRO = "Plain English", "Pro"
-MODES = (PLAIN, PRO)
+SIMPLE, PLAIN, PRO = "Simple", "Plain English", "Pro"
+MODES = (SIMPLE, PLAIN, PRO)
 
 TEXT: dict[str, Entry] = {
     # ------------------------------------------------------------------ app
@@ -30,9 +30,10 @@ TEXT: dict[str, Entry] = {
     },
     "mode.label": "Explanations",
     "mode.help": (
+        "Simple is for complete beginners: just the price, profit and loss, and risk, on two tools. "
         "Plain English translates every term, adds a one-line explanation under each result and keeps "
         "advanced settings on sensible defaults. Pro shows standard notation, every parameter, "
-        "technical diagnostics and the equations. Both use exactly the same pricing engine."
+        "technical diagnostics and the equations. All three use exactly the same pricing engine."
     ),
     "mode.caption": {
         "plain": "Everyday words, sensible defaults.",
@@ -49,7 +50,7 @@ TEXT: dict[str, Entry] = {
     "nav.backtest": "Backtest",
     "navshort.backtest": "Backtest",
     "navshort.market": "Market",
-    "navshort.pricer": "Pricer",
+    "navshort.pricer": {"plain": "Pricer", "pro": "Pricer", "simple": "Option price"},
     "navshort.greeks": "Greeks",
     "navshort.payoff": "Payoff",
     "navshort.surface": "Surface",
@@ -105,12 +106,13 @@ TEXT: dict[str, Entry] = {
         "- [VALIDATION]: proof that the maths is right\n"
         "- [METHODS]: how each model works"
     ),
-    "guide.mode.title": "Plain English or Pro",
+    "guide.mode.title": "Simple, Plain English or Pro",
     "guide.mode.body": (
-        "Top right. [PLAIN ENGLISH] uses everyday words, explains every result and keeps advanced "
+        "Top right. [SIMPLE] strips everything back to price, profit and risk for complete beginners. "
+        "[PLAIN ENGLISH] uses everyday words, explains every result and keeps advanced "
         "settings out of the way. [PRO] shows standard finance notation, every setting and extra "
         "diagnostics.\n"
-        "The maths is identical in both. If you're new, stay on [PLAIN ENGLISH]."
+        "The maths is identical in all three. Brand new to options? Try [SIMPLE] first."
     ),
     "guide.readout.title": "The live readout",
     "guide.readout.body": (
@@ -875,6 +877,83 @@ TEXT: dict[str, Entry] = {
     "vs.market.note": "Market quotes for {ticker} on {date}: {n} out-of-the-money options across {k} expiries.",
 
     # -------------------------------------------------------------- backtest
+    # ------------------------------------------------------------------ Simple mode
+    "simple.price.title": "Option price",
+    "simple.price.lede": "Pick a stock and a bet. See what it costs and what you could make or lose.",
+    "simple.stock": "Stock",
+    "simple.ticker": "Stock",
+    "simple.manual": "Couldn't load live prices. Enter them yourself:",
+    "simple.manual.price": "Stock price ($)",
+    "simple.manual.moves": "How much it moves",
+    "simple.moves.calm": "Calm",
+    "simple.moves.normal": "Normal",
+    "simple.moves.wild": "Wild",
+    "simple.bet": "Your bet",
+    "simple.bet.up": "Price goes up",
+    "simple.bet.down": "Price goes down",
+    "simple.strike": "Strike price ($)",
+    "simple.expiry": "Ends in",
+    "simple.exp.1w": "1 week",
+    "simple.exp.1m": "1 month",
+    "simple.exp.3m": "3 months",
+    "simple.exp.6m": "6 months",
+    "simple.exp.1y": "1 year",
+    "simple.contracts": "Contracts",
+    "simple.today": "{ticker} today",
+    "simple.cost": "Cost",
+    "simple.cost.sub": "${per_share} per share × 100 × {n}",
+    "simple.breakeven": "Break-even",
+    "simple.breakeven.sub": "{ticker} must {dir} {pct} by the end",
+    "simple.rise": "rise",
+    "simple.fall": "fall",
+    "simple.max_loss": "Most you can lose",
+    "simple.max_loss.sub": "if {ticker} {dir} {strike}",
+    "simple.ends_below": "ends below",
+    "simple.ends_above": "ends above",
+    "simple.max_gain": "Most you can make",
+    "simple.unlimited": "Unlimited",
+    "simple.max_gain.sub.call": "the higher it goes, the more you make",
+    "simple.max_gain.sub.put": "if {ticker} falls to $0",
+    "simple.chance": "Chance of profit",
+    "simple.chance.sub": "estimate",
+    "simple.scenarios": "If {ticker} ends at",
+    "simple.chart": "Profit or loss when it ends",
+    "simple.chart.x": "{ticker} price at the end ($)",
+    "simple.chart.y": "Profit / loss ($)",
+    "simple.chart.today": "Today",
+    "simple.chart.breakeven": "Break-even",
+    "simple.price.note": "Estimated price, based on how much {ticker} moved over the past year.",
+    "simple.bt.title": "Backtest",
+    "simple.bt.lede": "How a strategy would have done, compared with just owning the shares.",
+    "simple.bt.period": "Over the last",
+    "simple.bt.strategy": "Strategy",
+    "simple.bt.amount": "Starting amount ($)",
+    "simple.bt.file": "Use a price file instead",
+    "simple.bt.became": "Your {amount} became",
+    "simple.bt.shares": "Just owning the shares",
+    "simple.bt.vs": "Vs owning the shares",
+    "simple.bt.vs.sub": "{more_less} than just owning the shares",
+    "simple.more": "more",
+    "simple.less": "less",
+    "simple.bt.per_year": "Per year",
+    "simple.bt.drop": "Biggest drop",
+    "simple.bt.risk": "Risk",
+    "simple.bt.wins": "Winning months",
+    "simple.bt.wins.value": "{wins} of {total}",
+    "simple.bt.shares_sub": "shares {value}",
+    "simple.risk.low": "Low",
+    "simple.risk.medium": "Medium",
+    "simple.risk.high": "High",
+    "simple.bt.chart": "Your money over time",
+    "simple.bt.chart.y": "Value ($)",
+    "simple.bt.months": "Profit or loss each month",
+    "simple.bt.note": "Estimated with model option prices and typical trading costs.",
+    "simple.strat.covered_call": "Covered call · extra income from shares you own",
+    "simple.strat.protective_put": "Protective put · shares with insurance",
+    "simple.strat.collar": "Collar · cheap insurance, capped gains",
+    "simple.strat.cash_secured_put": "Cash-secured put · get paid to wait",
+    "simple.strat.long_straddle": "Straddle · bet on a big move",
+    "simple.strat.iron_condor": "Iron condor · bet on a quiet market",
     "feedback.button": "Feedback",
     "feedback.button.help": "Found a bug or something confusing? Tell me here (opens in a new tab).",
     "bt.title": {"plain": "How would it have done?", "pro": "Backtest"},
@@ -1347,7 +1426,12 @@ def t(key: str, mode: str = PLAIN, **fmt: object) -> str:
     if entry is None:
         return f"[{key}]"
     if isinstance(entry, dict):
-        text = entry["pro"] if mode == PRO else entry["plain"]
+        if mode == PRO:
+            text = entry["pro"]
+        elif mode == SIMPLE:
+            text = entry.get("simple", entry["plain"])
+        else:
+            text = entry["plain"]
     else:
         text = entry
     return text.format(**fmt) if fmt else text
