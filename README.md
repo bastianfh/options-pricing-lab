@@ -30,10 +30,10 @@ The first time you switch to Plain English or Pro, a short **guide** walks you t
 
 There's a **Simple / Plain English / Pro** switch in the top bar.
 
-- **Simple** (the default) is for complete beginners. It cuts the app down to two screens with no jargon:
-  - **Option price:** pick a stock, pick "price goes up" or "price goes down", a strike and when it ends. You see the cost, break-even, the most you can lose and make, the chance of profit, what happens if the stock moves ±10–20%, and a profit/loss chart.
-  - **Backtest:** pick a stock, a strategy and a starting amount. You see what it became next to just owning the shares, the biggest drop, a low/medium/high risk level and how many months won. Volatility, rates and costs are filled in for you.
-  - Every chart has a **Save image** button (a sharp PNG), and **Generate report** downloads a one-page report of your choices, results and charts.
+- **Simple** (the default) is for complete beginners: every strategy the app has, with the clutter stripped out, a bit like a trading app. Two screens:
+  - **Option price:** pick a stock and a strategy (buy a call or put, covered call, protective put, collar, cash-secured put, straddle, strangle, bull/bear spreads, iron condor) or **build your own** from calls, puts and shares. One big number for what you pay or receive, a profit/loss chart with expiry buttons under it, and break-even, max profit, max loss and chance of profit.
+  - **Backtest:** the same strategies (or your own) on real history. One big number for what your money became, a chart against just owning the shares with 1Y/2Y/5Y/10Y buttons under it, then the gap vs the shares, per year, biggest drop, a low/medium/high risk level and winning months.
+  - Volatility, rates and costs are filled in for you. Every chart has a **Save image** button, and **Generate report** downloads your choices, results and charts.
 - **Plain English** explains everything in everyday words.
 - **Pro** shows the proper notation and extra detail.
 

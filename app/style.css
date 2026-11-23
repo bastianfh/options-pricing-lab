@@ -355,6 +355,15 @@ a:focus-visible, button:focus-visible, [role="slider"]:focus-visible { outline: 
 .opl-cmp-row span { color: var(--label); font-size: 11px; letter-spacing: 0.04em; }
 
 /* ---------- Simple mode ---------- */
+.opl-hero { padding: 0.1rem 0 0.5rem 0; }
+.opl-hero .k { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; color: var(--label); }
+.opl-hero .v { font-family: var(--mono); font-size: 46px; font-weight: 500; color: var(--ink); line-height: 1.1;
+  margin: 0.15rem 0 0.1rem 0; letter-spacing: -0.01em; }
+.opl-hero .d { font-family: var(--mono); font-size: 15px; font-weight: 500; }
+.opl-hero .d.pos { color: var(--pos); }
+.opl-hero .d.neg { color: var(--neg); }
+.opl-hero .m { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--label); margin-top: 0.4rem; }
+@media (max-width: 760px) { .opl-hero .v { font-size: 36px; } }
 .opl-simple-grid .opl-cell .v { font-size: 22px; }
 .opl-simple-hero .opl-cell .v { font-size: 30px; }
 @media (max-width: 760px) {

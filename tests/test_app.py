@@ -249,32 +249,51 @@ def test_feedback_link_can_point_at_a_form(monkeypatch: pytest.MonkeyPatch) -> N
 
 # --------------------------------------------------------------------------- Simple mode
 
-@pytest.mark.parametrize("direction", ["up", "down"])
-def test_simple_price_screen_shows_the_essentials(direction: str) -> None:
+SIMPLE_STRATEGIES = ["long_call", "long_put", "covered_call", "protective_put", "collar", "cash_secured_put",
+                     "long_straddle", "long_strangle", "bull_call_spread", "bear_put_spread", "iron_condor", "custom"]
+
+
+def _simple(page: str, **state: object) -> AppTest:
     at = AppTest.from_file(APP, default_timeout=120)
     at.query_params["mode"] = "Simple"
-    at.session_state["sp_dir"] = direction
+    for key, value in state.items():
+        at.session_state[key] = value
+    at.session_state["_goto"] = page
     at.run()
     assert not at.exception, [e.message for e in at.exception]
-    html_text = " ".join(str(h.proto) for h in at.get("html"))
-    for label in ("COST", "BREAK-EVEN", "MOST YOU CAN LOSE", "MOST YOU CAN MAKE", "CHANCE OF PROFIT"):
-        assert label in html_text
-    assert ("UNLIMITED" in html_text) == (direction == "up")
+    return at
+
+
+def _html(at: AppTest) -> str:
+    return " ".join(str(h.proto) for h in at.get("html"))
+
+
+@pytest.mark.parametrize("strategy", SIMPLE_STRATEGIES)
+def test_simple_price_screen_offers_every_strategy(strategy: str) -> None:
+    at = _simple("pricer", sp_strategy=strategy)
+    text = _html(at)
+    assert "YOU PAY" in text or "YOU RECEIVE" in text
+    for label in ("BREAK-EVEN", "MAX PROFIT", "MAX LOSS", "CHANCE OF PROFIT"):
+        assert label in text
     assert at.session_state["nav_tool"] == "pricer"
     assert not at.session_state.get("guide_active")  # the full-lab guide stays out of Simple mode
 
 
-@pytest.mark.parametrize("strategy", ["covered_call", "iron_condor", "long_straddle"])
-def test_simple_backtest_screen_runs(strategy: str) -> None:
-    at = AppTest.from_file(APP, default_timeout=120)
-    at.query_params["mode"] = "Simple"
-    at.session_state["sb_strategy"] = strategy
-    at.session_state["_goto"] = "backtest"
-    at.run()
-    assert not at.exception, [e.message for e in at.exception]
-    html_text = " ".join(str(h.proto) for h in at.get("html"))
+def test_simple_price_screen_risk_shapes() -> None:
+    call = _html(_simple("pricer", sp_strategy="long_call"))
+    assert "YOU PAY" in call and "UNLIMITED" in call  # unlimited upside
+    condor = _html(_simple("pricer", sp_strategy="iron_condor"))
+    assert "YOU RECEIVE" in condor and "UNLIMITED" not in condor  # a credit, with both sides capped
+    covered = _html(_simple("pricer", sp_strategy="covered_call"))
+    assert "BUY 100 SHARES" in covered and "SELL 1 CALL" in covered
+
+
+@pytest.mark.parametrize("strategy", SIMPLE_STRATEGIES)
+def test_simple_backtest_screen_offers_every_strategy(strategy: str) -> None:
+    at = _simple("backtest", sb_strategy=strategy)
+    text = _html(at)
     for label in ("YOUR $10,000 BECAME", "JUST OWNING THE SHARES", "BIGGEST DROP", "RISK", "WINNING MONTHS"):
-        assert label in html_text
+        assert label in text.upper()
 
 
 def test_simple_mode_only_offers_the_two_simple_tools() -> None:
@@ -298,10 +317,13 @@ def test_simple_wording_falls_back_to_plain_english() -> None:
 
 
 def test_simple_helpers() -> None:
-    from app.simple import money, nice_strike, risk_level
+    from app.simple import catalog_legs, legs_line, money, nice_strike, risk_level
 
     assert money(-1006.4) == "−$1,006" and money(41, signed=True) == "+$41" and money(0, signed=True) == "$0"
-    assert nice_strike(349.08) == 350 and nice_strike(42.4) == 42
+    assert nice_strike(349.08) == 350 and nice_strike(42.4) == 42 and nice_strike(12.3) == 12.5
+    assert len(catalog_legs("iron_condor")) == 4 and catalog_legs("long_put")[0].kind == "put"
+    assert legs_line([("stock", 100, None), ("call", -1, "$365")]) == "BUY 100 SHARES · SELL 1 CALL $365"
+    assert legs_line([("stock", 1, None)]) == "BUY 1 SHARE"
     assert risk_level(0.06, 0.08) == "low" and risk_level(0.15, 0.12) == "medium" and risk_level(0.12, 0.34) == "high"
 
 
